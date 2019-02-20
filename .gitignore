@@ -1,0 +1,16 @@
+# ignore all object files
+*.o
+
+# also ignore makefile rules generation
+*.d
+
+# ignore .gdb_history
+.gdb_history
+
+# don't put databases in git history either
+*.dat
+*.db
+
+# don't keep the binary in source control either
+birc
+
