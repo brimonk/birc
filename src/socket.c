@@ -5,15 +5,16 @@
  * Easy Sockets
  */
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/select.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netdb.h>
 
 int get_socket(const char* host, const char* port)
 {
@@ -34,7 +35,7 @@ int get_socket(const char* host, const char* port)
 
 	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
-	if (s < 0 ) {
+	if (s < 0) {
 		fprintf(stderr, "Couldn't get socket.\n");
 		goto error;
 	}
