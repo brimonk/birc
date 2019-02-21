@@ -15,12 +15,30 @@
 #include "socket.h"
 #include "irc.h"
 #include "fio.h"
+#include "common.h"
 
 /* function declarations */
+static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_google(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_insult(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_wiki(irc_t *irc, char *irc_nick, char *arg);
+
+struct ircfunc_t {
+	char *command;
+	char *usage;
+	int (*func)(irc_t *, char *, char *);
+};
+
+static struct ircfunc_t ircfuncs[] = {
+	{"help",   "USAGE: !help <command>",  irc_botcmd_help},
+	{"ping",   "USAGE: !ping",            irc_botcmd_ping},
+	{"smack",  "USAGE: !smack <person>",  irc_botcmd_smack},
+	{"google", "USAGE: !google <search>", irc_botcmd_google},
+	{"insult", "USAGE: !insult <person>", irc_botcmd_insult},
+	{"wiki",   "USAGE: !wiki <search>",   irc_botcmd_wiki}
+};
 
 /* irc_connect : connect to an irc server */
 int irc_connect(irc_t *irc, const char* server, const char* port)
@@ -73,6 +91,10 @@ int irc_handle_data(irc_t *irc)
 		case '\n':
 			irc->servbuf[irc->bufptr] = '\0';
 			irc->bufptr = 0;
+
+			if (strlen(irc->servbuf) == 0) {
+				return 0;
+			}
 
 			FIO_PRINTF(FIO_LOG, "%s", irc->servbuf);
 
@@ -166,6 +188,7 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 {
 	char *command;
 	char *arg;
+	int i;
 
 	if (*msg != '!')
 		return 0;
@@ -182,6 +205,14 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 	if (command == NULL)
 		return 0;
 
+	/* spin through the table we defined above */
+	for (i = 0; i < ARRSIZE(ircfuncs); i++) {
+		if (strcmp(command, ircfuncs[i].command) == 0) {
+			return ircfuncs[i].func(irc, irc_nick, arg);
+		}
+	}
+
+#if 0
 	if (strcmp(command, "ping") == 0) {
 		return irc_botcmd_ping(irc, irc_nick, arg);
 	}
@@ -198,6 +229,42 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 		return irc_botcmd_insult(irc, irc_nick, arg);
 	}
 
+	if (strcmp(command, "wiki") == 0) {
+		return irc_botcmd_wiki(irc, irc_nick, arg);
+	}
+#endif
+
+	return 0;
+}
+
+/* irc_botcmd_help : handles help command and prints command usage info */
+static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg)
+{
+	int i, len;
+	char buf[256];
+
+	/*
+	 * if no arguments are present, we print all of the available commands
+	 * if arguments were passed, check if it's a command, if so, print the usage
+	 */
+
+	if (arg) {
+	} else {
+		snprintf(buf, sizeof(buf), "Commands: ");
+		for (i = 0, len = strlen(buf); i < ARRSIZE(ircfuncs) || len >= 200;
+				i++, len = strlen(buf)) {
+			snprintf(buf + len, sizeof(buf) - len, "!%s ", ircfuncs[i].command);
+		}
+	}
+
+	irc_msg(irc->s, irc->channel, buf);
+
+	return 0;
+}
+
+/* irc_botcmd_wiki : adds a sloo of wiki functionality */
+static int irc_botcmd_wiki(irc_t *irc, char *irc_nick, char *arg)
+{
 	return 0;
 }
 

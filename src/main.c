@@ -5,7 +5,7 @@
  * Brian Chrzanowski's IRC Bot
  *
  * TODO (Brian)
- * 1. Setup Module Loading
+ * Static C Source Inclusion, for programmable modules
  */
 
 #include <stdio.h>
