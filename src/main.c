@@ -46,8 +46,6 @@ int main(int argc, char **argv)
 		goto exit_err;
 	}
 
-	irc_set_output(&irc, "output");
-
 	if (irc_login(&irc, "brimonk_testbot") < 0) {
 		fprintf(stderr, "Couldn't log in.\n");
 		goto exit_err;

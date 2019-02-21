@@ -10,6 +10,7 @@
 #include <time.h>
 
 #include <unistd.h>
+#include <errno.h>
 
 #include "socket.h"
 #include "irc.h"
@@ -58,13 +59,13 @@ int irc_handle_data(irc_t *irc)
 	char tempbuffer[512];
 	int rc, i;
 
+	/* wait for and receive data from the server */
 	if ((rc = sck_recv(irc->s, tempbuffer, sizeof(tempbuffer) - 2)) <= 0) {
-		fprintf(stderr, ":v\n");
+		FIO_PRINTF(FIO_ERR, "Got -1 From Socket %s", strerror(errno));
 		return -1;
 	}
 
 	tempbuffer[rc] = '\0';
-	fprintf(stderr, "%s", tempbuffer);
 
 	for (i = 0; i < rc; i++) {
 		switch (tempbuffer[i]) {
@@ -72,6 +73,8 @@ int irc_handle_data(irc_t *irc)
 		case '\n':
 			irc->servbuf[irc->bufptr] = '\0';
 			irc->bufptr = 0;
+
+			FIO_PRINTF(FIO_LOG, "%s", irc->servbuf);
 
 			if (irc_parse_action(irc) < 0)
 				return -1;
@@ -158,14 +161,6 @@ int irc_parse_action(irc_t *irc)
 	return 0;
 }
 
-int irc_set_output(irc_t *irc, const char* file)
-{
-	irc->file = fopen(file, "w");
-	if ( irc->file == NULL )
-		return -1;
-	return 0;
-}
-
 /* irc_reply_message : checks if someone calls on the bot */
 int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 {
@@ -247,6 +242,11 @@ static int irc_botcmd_insult(irc_t *irc, char *irc_nick, char *arg)
 	randline = rand() % lines;
 
 	fio_getline(insultfp, insultbuf, sizeof(insultbuf), randline);
+
+	/* see if we need to remove the newline from the insult */
+	if (insultbuf[strlen(insultbuf) - 1] == '\n') {
+		insultbuf[strlen(insultbuf) - 1] = '\0';
+	}
 
 	return irc_msg(irc->s, irc->channel, insultbuf);
 
@@ -345,8 +345,8 @@ int irc_log_message(irc_t *irc, const char* nick, const char* message)
 	strftime(timestring, 127, "%F - %H:%M:%S", localtime(&curtime));
 	timestring[127] = '\0';
 
-	fprintf(irc->file, "%s - [%s] <%s> %s\n", irc->channel, timestring, nick, message);
-	fflush(irc->file);
+	FIO_PRINTF(FIO_LOG, "%s [%s] <%s> %s\n",
+			irc->channel, timestring, nick, message);
 
 	return 0;
 }
@@ -354,7 +354,6 @@ int irc_log_message(irc_t *irc, const char* nick, const char* message)
 void irc_close(irc_t *irc)
 {
 	close(irc->s);
-	fclose(irc->file);
 }
 
 /* irc_pong : answers pong requests */
@@ -402,12 +401,14 @@ int irc_topic(int s, const char *channel, const char *data)
 /* irc_action : executes an action (.e.g /me is hungry) */
 int irc_action(int s, const char *channel, const char *data)
 {
+	FIO_PRINTF(FIO_LOG, "PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
 	return sck_sendf(s, "PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
 }
 
 /* irc_msg : sends a channel message or a query */
 int irc_msg(int s, const char *channel, const char *data)
 {
+	FIO_PRINTF(FIO_LOG, "PRIVMSG %s :%s\r\n", channel, data);
 	return sck_sendf(s, "PRIVMSG %s :%s\r\n", channel, data);
 }
 

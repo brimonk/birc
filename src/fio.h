@@ -4,11 +4,12 @@
 #include <stdarg.h>
 
 enum {
+	FIO_NON,
+	FIO_LOG,
 	FIO_MSG,
 	FIO_WRN,
 	FIO_ERR,
-	FIO_VER,
-	FIO_NON
+	FIO_VER
 };
 
 FILE *fio_getstaticfp();

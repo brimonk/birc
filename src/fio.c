@@ -11,6 +11,8 @@
 
 #include "fio.h"
 
+#define PRINTTOSTDOUT 1
+
 static char buf[512];
 static FILE *modfp = NULL;
 
@@ -38,7 +40,8 @@ int fio_printf(char *file, int line, int level, char *fmt, ...)
 {
 	va_list args;
 	char *ptr;
-	int rc;
+	int rc, tmp;
+	char bigbuf[1024];
 
 	rc = 0;
 
@@ -48,44 +51,60 @@ int fio_printf(char *file, int line, int level, char *fmt, ...)
 	if (strlen(fmt) == 0)
 		return rc;
 
+	memset(bigbuf, 0, sizeof(bigbuf));
+
 	va_start(args, fmt); /* get the arguments from the stack */
 
 	switch (level) {
 	case FIO_MSG:
-		rc = fprintf(modfp, "%s:%d MSG ", file, line);
+		rc = snprintf(bigbuf, sizeof(bigbuf), "%s:%-4d MSG ", file, line);
 		break;
 
 	case FIO_WRN:
-		rc = fprintf(modfp, "%s:%d WRN ", file, line);
+		rc = snprintf(bigbuf, sizeof(bigbuf), "%s:%-4d WRN ", file, line);
 		break;
 
 	case FIO_ERR:
-		rc = fprintf(modfp, "%s:%d ERR ", file, line);
+		rc = snprintf(bigbuf, sizeof(bigbuf), "%s:%-4d ERR ", file, line);
 		break;
 
 	case FIO_VER:
-		rc = fprintf(modfp, "%s:%d VER ", file, line);
+		rc = snprintf(bigbuf, sizeof(bigbuf), "%s:%-4d VER ", file, line);
 		break;
 
 	case FIO_NON:
 		/* NON doesn't print any debug messages */
 		break;
 
+	case FIO_LOG:
+		rc = snprintf(bigbuf, sizeof(bigbuf), "%s:%-4d LOG ", file, line);
+		// rc = snprintf(bigbuf, sizeof(bigbuf), "LOG ");
+		break;
+
+
 	default:
-		rc = fprintf(modfp, "%s:%d UNKNOWN ", file, line);
+		rc = fprintf(modfp, "%s:%-4d UNKNOWN ", file, line);
 		break;
 	};
 
 	/* print the rest of the message */
-	rc += vfprintf(modfp, fmt, args);
+	tmp = strlen(bigbuf);
+	rc += vsnprintf(bigbuf + tmp, sizeof(bigbuf) - tmp, fmt, args);
 
 	va_end(args); /* cleanup stack arguments */
 
-	/* writes a newline if the last character of the format wasn't a newline */
+	/* writes a newline if the last character of the buffer isn't a newline */
+	tmp = strlen(bigbuf);
 	ptr = fmt + strlen(fmt) - 1;
 	if (*ptr != '\n') {
-		fprintf(modfp, "\n");
+		sprintf(bigbuf + tmp, "\n");
 	}
+
+	/* finally, print the buffer out into our file, and optionally stdout */
+	fprintf(modfp, "%s", bigbuf);
+#ifdef PRINTTOSTDOUT
+	printf("%s", bigbuf);
+#endif
 
 	return rc;
 }
