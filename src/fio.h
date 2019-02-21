@@ -11,9 +11,12 @@ enum {
 	FIO_NON
 };
 
-void fio_setfp(FILE *fp);
-void fio_closefp();
+FILE *fio_getstaticfp();
+int fio_lines(FILE *fp);
 int fio_printf(char *file, int line, int level, char *fmt, ...);
+int fio_getline(FILE *fp, char *buf, int buflen, int line);
+void fio_closefp();
+void fio_setfp(FILE *fp);
 
 #define FIO_PRINTF(level, fmt, ...) \
 	fio_printf(__FILE__, __LINE__, (level), (fmt), ##__VA_ARGS__)

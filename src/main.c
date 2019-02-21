@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 #include <dlfcn.h>
 #include <sys/types.h>
@@ -23,19 +24,22 @@
 #define MAXMODS 16
 #define DEFAULTMODDIR "./mod"
 
-int loadmoddir(const char *dir, struct modtable_t *tab, int tablen);
-void *loadmod(const char *file);
+int run;
+
+void sighandler(int signal)
+{
+	run = 0;
+}
 
 int main(int argc, char **argv)
 {
-	struct modtable_t modtable[MAXMODS];
+	FILE *fp;
 	irc_t irc;
 
-	fio_setfp(fopen("birc_log.txt", "a"));
+	fp = fopen("log.txt", "a");
 
-	FIO_PRINTF(FIO_ERR, "More Newlines\n");
-
-	loadmoddir(DEFAULTMODDIR, modtable, MAXMODS);
+	fio_setfp(fp);
+	run = 1;
 
 	if (irc_connect(&irc, "irc.freenode.org", "6667") < 0) {
 		fprintf(stderr, "Connection failed.\n");
@@ -54,7 +58,9 @@ int main(int argc, char **argv)
 		goto exit_err;
 	}
 
-	while (irc_handle_data(&irc) >= 0);
+	while (irc_handle_data(&irc) >= 0 && run);
+
+	/* print quitting message */
 
 	irc_close(&irc);
 	fio_closefp();
@@ -65,68 +71,5 @@ exit_err:
 	irc_close(&irc);
 	fio_closefp();
 	return 1;
-}
-
-/* loadmoddir : load all modules in a directory */
-int loadmoddir(const char *dir, struct modtable_t *tab, int tablen)
-{
-	DIR *moddir;
-	struct dirent *currdir;
-	int i;
-
-	moddir = opendir(dir);
-
-	if (!moddir) {
-		FIO_PRINTF(FIO_ERR, "Couldn't open %s : %s", dir, strerror(errno));
-		return 0;
-	}
-
-	for (i = 0; i < tablen; i++) {
-		errno = 0;
-		currdir = readdir(moddir); /* read the dir */
-
-		if (!currdir)
-			break;
-
-		tab[i].path = strdup(&currdir->d_name[0]);
-		tab[i].func = loadmod(currdir->d_name);
-
-		if (!tab[i].func)
-			FIO_PRINTF(FIO_ERR, "Couldn't load shared lib: %s", dlerror());
-	}
-
-	if (!currdir && errno) {
-		FIO_PRINTF(FIO_ERR, "directory read error: %s", strerror(errno));
-	}
-
-	closedir(moddir);
-
-	if (i == tablen) {
-		FIO_PRINTF(FIO_WRN, "not all modules loaded\n");
-	}
-
-	return i;
-}
-
-void *loadmod(const char *file)
-{
-#define MODULEENTRY "birc_entry"
-	void *ptr;
-
-	ptr = dlopen(file, RTLD_LAZY);
-
-	return ptr;
-}
-
-void cleanmod(struct modtable_t *tab, int tablen)
-{
-	int i;
-
-	for (i = 0; i < tablen; i++) {
-		if (tab[i].path)
-			free(tab[i].path);
-		if (tab[i].func)
-			dlclose(tab[i].path);
-	}
 }
 

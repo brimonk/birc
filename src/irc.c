@@ -13,6 +13,13 @@
 
 #include "socket.h"
 #include "irc.h"
+#include "fio.h"
+
+/* function declarations */
+static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_google(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_insult(irc_t *irc, char *irc_nick, char *arg);
 
 /* irc_connect : connect to an irc server */
 int irc_connect(irc_t *irc, const char* server, const char* port)
@@ -22,6 +29,9 @@ int irc_connect(irc_t *irc, const char* server, const char* port)
 	}
 
 	irc->bufptr = 0;
+
+	/* seed the RNG machine */
+	srand(time(NULL));
 
 	return 0;
 }
@@ -80,33 +90,34 @@ int irc_handle_data(irc_t *irc)
 	return 0;
 }
 
+/* irc_parse_action : parses the incoming action the server's sending us */
 int irc_parse_action(irc_t *irc)
 {
+	char *ptr;
+	int privmsg;
 	char irc_nick[128];
 	char irc_msg[512];
 
-	if (strncmp(irc->servbuf, "PING :", 6) == 0) {
+	privmsg = 0;
+
+	if (strncmp(irc->servbuf, "PING :", 6) == 0) { /* see if it's a ping */
 		return irc_pong(irc->s, &irc->servbuf[6]);
 
 	} else if (strncmp(irc->servbuf, "NOTICE AUTH :", 13) == 0) {
-		// Don't care
+		/* we really don't care about NOTICE AUTH junk */
 		return 0;
 
 	} else if (strncmp(irc->servbuf, "ERROR :", 7) == 0) {
-		// Still don't care
+		/* log the fact that the server sent us an error and move on */
 		return 0;
 
 	} else {
-		// Parses IRC message that pulls out nick and message. 
+		/* parse the message to get nick, channel, message */
 
-		char *ptr;
-		int privmsg = 0;
-		char irc_nick[128];
-		char irc_msg[512];
 		*irc_nick = '\0';
 		*irc_msg = '\0';
 
-		// Checks if we have non-message string
+		/* see if we have a non-message string */
 		if (strchr(irc->servbuf, 1) != NULL)
 			return 0;
 
@@ -123,8 +134,8 @@ int irc_parse_action(irc_t *irc)
 
 			while ((ptr = strtok(NULL, " ")) != NULL) {
 				if (strcmp(ptr, "PRIVMSG") == 0) {
-				privmsg = 1;
-				break;
+					privmsg = 1;
+					break;
 				}
 			}
 
@@ -136,9 +147,9 @@ int irc_parse_action(irc_t *irc)
 				}
 			}
 
-			if (privmsg == 1 && strlen(irc_nick) > 0 && strlen(irc_msg) > 0) {
+			if (privmsg && strlen(irc_nick) > 0 && strlen(irc_msg) > 0) {
 				irc_log_message(irc, irc_nick, irc_msg);
-				if ( irc_reply_message(irc, irc_nick, irc_msg) < 0 )
+				if (irc_reply_message(irc, irc_nick, irc_msg) < 0)
 					return -1;
 			}
 		}
@@ -155,112 +166,174 @@ int irc_set_output(irc_t *irc, const char* file)
 	return 0;
 }
 
+/* irc_reply_message : checks if someone calls on the bot */
 int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 {
-   // Checks if someone calls on the bot.
-   if ( *msg != '!' )
-      return 0;
+	char *command;
+	char *arg;
 
-   char *command;
-   char *arg;
-   // Gets command
-   command = strtok(&msg[1], " ");
-   arg = strtok(NULL, "");
-   if ( arg != NULL )
-      while ( *arg == ' ' )
-         arg++;
+	if (*msg != '!')
+		return 0;
 
-   if ( command == NULL )
-      return 0;
+	/* get the actual command */
+	command = strtok(&msg[1], " ");
+	arg = strtok(NULL, "");
 
-   if ( strcmp(command, "ping") == 0)
-   {
-      if ( irc_msg(irc->s, irc->channel, "pong") < 0)
-         return -1;
-   }
-   else if ( strcmp(command, "war") == 0 )
-   {
-      if ( irc_msg(irc->s, irc->channel, "WMs again? gtfo.") < 0 )
-         return -1;
-   }
-   else if ( strcmp(command, "smack") == 0 )
-   {
-      char mesg[512];
-      srand(time(NULL));
-      int critical;
-      critical = (rand()%10)/8;
-      
-      if ( arg != NULL && strlen(arg) > 0 )
-      {
-         if ( critical )
-            snprintf(mesg, 511, "I smack thee, %s, for %d damage (it's super effective).", arg, rand()%20 + 21);
-         else
-            snprintf(mesg, 511, "I smack thee, %s, for %d damage.", arg, rand()%20 + 1);
-         mesg[511] = '\0';
-      }
-      else
-      {
-         snprintf(mesg, 511, "Behold, I smack thee, %s, for %d damage.", irc_nick, rand()%20 + 1);
-         mesg[511] = '\0';
-      }
-      if ( irc_msg(irc->s, irc->channel, mesg) < 0 )
-         return -1;
-   }
-   else if ( strcmp(command, "pacman") == 0 )
-   {
-      if ( irc_msg(irc->s, irc->channel, "Wocka, wocka, bitches!") < 0 )
-         return -1;
-   }
-   else if ( strcmp(command, "google") == 0 )
-   {
-      char mesg[512];
+	if (arg != NULL) {
+		while (*arg == ' ')
+			arg++;
+	}
 
-      char t_nick[128];
-      char t_link[256];
-      char link[256] = {0};
+	if (command == NULL)
+		return 0;
 
-      char *t_arg = strtok(arg, " ");
-      if ( t_arg )
-      {
-         strncpy(t_nick, t_arg, 127);
-         t_nick[127] = '\0';
-      }
-      else
-         return 0;
+	if (strcmp(command, "ping") == 0) {
+		return irc_botcmd_ping(irc, irc_nick, arg);
+	}
 
-      t_arg = strtok(NULL, "");
-      if ( t_arg )
-      {
-         while ( *t_arg == ' ' )
-            t_arg++;
+	if (strcmp(command, "smack") == 0) {
+		return irc_botcmd_smack(irc, irc_nick, arg);
+	}
 
-         strncpy(t_link, t_arg, 255);
-         t_link[255] = '\0';
-      }
-      else
-         return 0;
+	if (strcmp(command, "google") == 0) {
+		return irc_botcmd_google(irc, irc_nick, arg);
+	}
 
-      t_arg = strtok(t_link, " ");
-      while ( t_arg )
-      {
-         strncpy(&link[strlen(link)], t_arg, 254 - strlen(link));
+	if (strcmp(command, "insult") == 0) {
+		return irc_botcmd_insult(irc, irc_nick, arg);
+	}
 
-         t_arg = strtok(NULL, " ");
-         if ( !t_arg )
-            break;
+	return 0;
+}
 
-         strncpy(&link[strlen(link)], "%20", 254 - strlen(link));
-      }
+/* irc_botcmd_insult : picks insult from a file and throws shade */
+static int irc_botcmd_insult(irc_t *irc, char *irc_nick, char *arg)
+{
+	/*
+	 * TODO (Brian)
+	 * As of writing, I'm not super certain what the best way to do this is.
+	 * Ideally, all of the insults are stored in a file; however, if the file
+	 * isn't there, what happens? Does it fail silently and pop an error in the
+	 * log? Does it tell people in IRC the error?
+	 *
+	 * As of now, we'll have a statically defined file (path, data/insults.txt)
+	 * and if we can't open the file, we'll throw an error in the log and
+	 * silently fail in IRC.
+	 *
+	 * It's also a little "slow" because we don't keep the results in memory, we
+	 * just read it from a file whenever we want.
+	 */
 
+	FILE *insultfp;
+	char *ptr;
+	char *args[2];
+	int lines, randline, i;
+	char mesg[512], insultbuf[256];
 
+	memset(args, 0, sizeof(args));
+	memset(mesg, 0, sizeof(mesg));
+	memset(insultbuf, 0, sizeof(insultbuf));
 
-      snprintf(mesg, 511, "%s: http://lmgtfy.com/?q=%s", t_nick, link);
-      mesg[511] = '\0';
-      if ( irc_msg(irc->s, irc->channel, mesg) < 0 )
-         return -1;
-   }
-   
-   return 0;
+#define INSULTFILE "data/insults.txt"
+
+	/* try to open the file and get a random line */
+	insultfp = fopen(INSULTFILE, "r");
+	if (!insultfp) {
+		FIO_PRINTF(FIO_ERR, "Couldn't open %s : file not found", INSULTFILE);
+		return 0;
+	}
+
+	lines = fio_lines(insultfp);
+	randline = rand() % lines;
+
+	fio_getline(insultfp, insultbuf, sizeof(insultbuf), randline);
+
+	return irc_msg(irc->s, irc->channel, insultbuf);
+
+	/* retrieve up to two tokens, one for the */
+	ptr = strtok(arg, " ");
+	for (i = 0; i < 2 && ptr; i++, ptr = strtok(NULL, " ")) {
+		args[i] = ptr;
+	}
+
+	if (strcmp(args[0], "insult") != 0) {
+		return 0; /* don't want to die just because of bad command */
+	}
+
+	if (args[1]) {
+	} else {
+	}
+
+	fclose(insultfp);
+
+	return 0;
+}
+
+/* irc_botcmd_ping : responds to a user with "pong" */
+static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg)
+{
+	if (irc_msg(irc->s, irc->channel, "pong") < 0)
+		return -1;
+
+	return 0;
+}
+
+/* irc_botcmd_smack : smacks someone over TCP/IP */
+static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg)
+{
+	int damage;
+	char mesg[512];
+
+	damage = rand() % 21 + 1;
+
+	if (!arg) { /* if we have an argument, we'll smack the arg */
+		arg = irc_nick;
+	}
+
+	snprintf(mesg, 511, "smacks %s for %d damage%s.",
+			arg, damage, damage == 20 ? " (SUPER EFFECTIVE)" : "");
+
+	mesg[511] = '\0'; /* ensure we have a NULL terminated string */
+
+	if (irc_action(irc->s, irc->channel, mesg) < 0)
+		return -1;
+
+	return 0;
+}
+
+/* irc_botcmd_google : IRC command for generating Google Links */
+static int irc_botcmd_google(irc_t *irc, char *irc_nick, char *arg)
+{
+	int len;
+	char mesg[512];
+	char link[256];
+
+	memset(link, 0, 256); /* clean the buffer */
+
+	if (!arg)
+		return 0;
+
+	/* encode web safe bytes one at a time */
+	for (len = strlen(link);
+			len < sizeof(link) - 4 && *arg; arg++, len = strlen(link)) {
+		if (*arg < 48) { /* encoding */
+			snprintf(link + len, sizeof(link)-len, "%%%02x", *arg);
+		} else { /* no encoding */
+			snprintf(link + len, sizeof(link)-len, "%c", *arg);
+		}
+	}
+
+	if (len > sizeof(link) - 4) {
+		snprintf(mesg, 511, "search too long for IRC, search it yourself");
+	} else {
+		snprintf(mesg, 511, "https://www.google.com/search?q=%s", link);
+		mesg[511] = '\0';
+	}
+
+	if (irc_msg(irc->s, irc->channel, mesg) < 0)
+		return -1;
+
+	return 0;
 }
 
 int irc_log_message(irc_t *irc, const char* nick, const char* message)

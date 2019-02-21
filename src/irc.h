@@ -10,14 +10,9 @@ struct irc_t {
 	char *nick;
 	char servbuf[512];
 	int bufptr;
-}; 
+};
 
 typedef struct irc_t irc_t;
-
-struct modtable_t { /* functable_t : irc dynamic module table */
-	char *path;
-	void *func;
-};
 
 int irc_connect(irc_t *irc, const char* server, const char* port);
 int irc_login(irc_t *irc, const char* nick);

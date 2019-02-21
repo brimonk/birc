@@ -14,6 +14,11 @@
 static char buf[512];
 static FILE *modfp = NULL;
 
+FILE *fio_getstaticfp()
+{
+	return modfp;
+}
+
 /* fio_setfp : sets the module file pointer to fp, and sets line buffering */
 void fio_setfp(FILE *fp)
 {
@@ -83,5 +88,53 @@ int fio_printf(char *file, int line, int level, char *fmt, ...)
 	}
 
 	return rc;
+}
+
+/* fio_lines : get the number of lines in a FILE *fp */
+int fio_lines(FILE *fp)
+{
+	int lines, c;
+
+	if (!fp)
+		return -1;
+
+	rewind(fp);
+
+	/* read lines until you run out */
+	for (lines = 0, c = getc(fp); c != EOF; c = getc(fp)) {
+		if (c == '\n')
+			lines++;
+	}
+
+	return lines;
+}
+
+/* fio_getline : gets linenumber line from fp storing buflen chars in buf */
+int fio_getline(FILE *fp, char *buf, int buflen, int line)
+{
+	char *ptr;
+	int curr;
+	char tmpbuf[256];
+
+	if (!fp)
+		return -1;
+
+	rewind(fp);
+	curr = 0;
+
+	while ((ptr = fgets(tmpbuf, sizeof(tmpbuf), fp)) == tmpbuf) {
+		if (curr++ == line)
+			break;
+	}
+
+	/* have to see if the file has that line */
+	if (ptr == tmpbuf) {
+		curr = strlen(tmpbuf);
+		strncpy(buf, tmpbuf, curr > buflen ? buflen : curr);
+	} else {
+		return -1;
+	}
+
+	return 0;
 }
 

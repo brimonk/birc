@@ -14,3 +14,6 @@
 # don't keep the binary in source control either
 birc
 
+# don't keep the data directory, it really should be separate
+data/
+
