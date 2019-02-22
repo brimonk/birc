@@ -25,6 +25,8 @@ static int irc_botcmd_google(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_insult(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_wiki(irc_t *irc, char *irc_nick, char *arg);
 
+static int irc_bot_banter(irc_t *irc, char *irc_nick, char *arg);
+
 struct ircfunc_t {
 	char *command;
 	char *usage;
@@ -212,28 +214,13 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 		}
 	}
 
-#if 0
-	if (strcmp(command, "ping") == 0) {
-		return irc_botcmd_ping(irc, irc_nick, arg);
-	}
+	/* if we managed to get here, see if we can get off some witty banter */
+	return irc_bot_banter(irc, irc_nick, arg);
+}
 
-	if (strcmp(command, "smack") == 0) {
-		return irc_botcmd_smack(irc, irc_nick, arg);
-	}
-
-	if (strcmp(command, "google") == 0) {
-		return irc_botcmd_google(irc, irc_nick, arg);
-	}
-
-	if (strcmp(command, "insult") == 0) {
-		return irc_botcmd_insult(irc, irc_nick, arg);
-	}
-
-	if (strcmp(command, "wiki") == 0) {
-		return irc_botcmd_wiki(irc, irc_nick, arg);
-	}
-#endif
-
+static int irc_bot_banter(irc_t *irc, char *irc_nick, char *arg)
+{
+	FIO_PRINTF(FIO_VER, "irc_bot_banter not implemented yet\n");
 	return 0;
 }
 
@@ -248,9 +235,22 @@ static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg)
 	 * if arguments were passed, check if it's a command, if so, print the usage
 	 */
 
-	if (arg) {
-	} else {
-		snprintf(buf, sizeof(buf), "Commands: ");
+	if (arg) { /* we got an arg, find the one we need, and print the help */
+		for (i = 0; i < ARRSIZE(ircfuncs); i++) {
+			if (strcmp(arg, ircfuncs[i].command) == 0)
+				break;
+		}
+
+		if (i == ARRSIZE(ircfuncs)) {
+			snprintf(buf, sizeof(buf),
+					"%s: \"%s\" isn't a command", irc_nick, arg);
+		} else {
+			snprintf(buf, sizeof(buf), "%s: %s", irc_nick, ircfuncs[i].usage);
+		}
+
+
+	} else { /* no arg, print out all of the commands that we can fit in here */
+		snprintf(buf, sizeof(buf), "%s: commands: ", irc_nick);
 		for (i = 0, len = strlen(buf); i < ARRSIZE(ircfuncs) || len >= 200;
 				i++, len = strlen(buf)) {
 			snprintf(buf + len, sizeof(buf) - len, "!%s ", ircfuncs[i].command);
