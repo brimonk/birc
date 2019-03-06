@@ -3,6 +3,13 @@
  * Wed Feb 20, 2019 03:07
  *
  * IRC Library Functions
+ *
+ * TODO (Brian)
+ *
+ * * put the actual IRC command handling somewhere else
+ *   this file is supposed to be a library for easy IRC handling; however, it's
+ *   somewhat intermingled with the logging module, as well as it has an assload
+ *   of specific to my application commands
  */
 
 #include <stdio.h>
@@ -17,6 +24,7 @@
 #include "irc.h"
 #include "fio.h"
 #include "common.h"
+#include "stringext.h"
 
 static int url_encode(char *buf, int buflen, char *src, char *prefix);
 static int url_encode_byte(unsigned char in);
@@ -46,7 +54,10 @@ static struct ircfunc_t ircfuncs[] = {
 	{"wiki",   "USAGE: !wiki <search>",    irc_botcmd_wiki}
 };
 
-
+struct strdict_t {
+	char *key;
+	char *val;
+};
 
 #define WEBPREFIX_GOOGLE "https://www.google.com/search?q="
 #define WEBPREFIX_GITHUB "https://github.com/search?q="
@@ -58,8 +69,6 @@ int irc_connect(irc_t *irc, const char* server, const char* port)
 	if ((irc->s = get_socket(server, port)) < 0) {
 		return -1;
 	}
-
-	irc->bufptr = 0;
 
 	/* seed the RNG machine */
 	srand(time(NULL));
@@ -87,7 +96,7 @@ int irc_leave_channel(irc_t *irc)
 int irc_handle_data(irc_t *irc)
 {
 	char tempbuffer[512];
-	int rc, i;
+	int rc, i, bufidx;
 
 	/* wait for and receive data from the server */
 	if ((rc = sck_recv(irc->s, tempbuffer, sizeof(tempbuffer) - 2)) <= 0) {
@@ -96,13 +105,13 @@ int irc_handle_data(irc_t *irc)
 	}
 
 	tempbuffer[rc] = '\0';
+	bufidx = 0;
 
 	for (i = 0; i < rc; i++) {
 		switch (tempbuffer[i]) {
 		case '\r':
 		case '\n':
-			irc->servbuf[irc->bufptr] = '\0';
-			irc->bufptr = 0;
+			irc->servbuf[bufidx] = '\0';
 
 			if (strlen(irc->servbuf) == 0) {
 				return 0;
@@ -118,11 +127,11 @@ int irc_handle_data(irc_t *irc)
 			break;
 
 		default:
-			irc->servbuf[irc->bufptr] = tempbuffer[i];
-			if (irc->bufptr >= (sizeof(irc->servbuf) -1))
+			irc->servbuf[bufidx] = tempbuffer[i];
+			if (bufidx >= (sizeof(irc->servbuf) -1))
 				; // Overflow!
 			else
-				irc->bufptr++;
+				bufidx++;
 		}
 	}
 
@@ -204,35 +213,61 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 	char *arg;
 	int i;
 
-	if (*msg != '!')
-		return 0;
+	if (*msg == '!') { /* if we have a thing formatted like a command... */
+		/* get the actual command */
+		command = strtok(&msg[1], " ");
+		arg = strtok(NULL, "");
 
-	/* get the actual command */
-	command = strtok(&msg[1], " ");
-	arg = strtok(NULL, "");
+		if (arg != NULL) {
+			while (*arg == ' ')
+				arg++;
+		}
 
-	if (arg != NULL) {
-		while (*arg == ' ')
-			arg++;
+		if (command != NULL) {
+			/* spin through the table of commands */
+			for (i = 0; i < ARRSIZE(ircfuncs); i++) {
+				if (strcmp(command, ircfuncs[i].command) == 0) {
+					return ircfuncs[i].func(irc, irc_nick, arg);
+				}
+			}
+		}
+	} else { /* non command stuff */
+		return irc_bot_banter(irc, irc_nick, msg);
 	}
 
-	if (command == NULL)
-		return 0;
+	return 0;
+}
 
-	/* spin through the table we defined above */
-	for (i = 0; i < ARRSIZE(ircfuncs); i++) {
-		if (strcmp(command, ircfuncs[i].command) == 0) {
-			return ircfuncs[i].func(irc, irc_nick, arg);
+/* irc_bot_banter : define a static table to wittily respond to quips in chat */
+static int irc_bot_banter(irc_t *irc, char *irc_nick, char *arg)
+{
+	static struct strdict_t dict[] = {
+		{"Hi", "Hello There!"},
+		{"Hello", "You may approach the bench"},
+		{"thank", "No, THANK YOU!"},
+		{"lol", "heh"},
+		{"heh", "lol"},
+		{"rofl", "OMFGWTFLMAO"},
+		{"lmao", "I'll bet you're laughing your ass off."}
+	};
+	int i;
+	char buf[512];
+
+	/* check if the message is in all upper case first */
+	if (strisupper(arg)) {
+		snprintf(buf, sizeof(buf), "%s QUIT SHOUTING!!", irc_nick);
+		irc_msg(irc->s, irc->channel, buf);
+		return 0;
+	}
+
+	/* iterate through the table to see if we have a match */
+	for (i = 0; i < ARRSIZE(dict); i++) {
+		if (re_match(dict[i].key, arg)) {
+			snprintf(buf, sizeof(buf), "%s", dict[i].val);// probably don't need
+			irc_msg(irc->s, irc->channel, buf);
 		}
 	}
 
-	/* if we managed to get here, see if we can get off some witty banter */
-	return irc_bot_banter(irc, irc_nick, arg);
-}
-
-static int irc_bot_banter(irc_t *irc, char *irc_nick, char *arg)
-{
-	FIO_PRINTF(FIO_VER, "irc_bot_banter not implemented yet\n");
 	return 0;
 }
 
