@@ -7,6 +7,7 @@
  * "The Practice of Programming"
  */
 
+#include <ctype.h>
 #include <string.h>
 #include "string.h"
 
