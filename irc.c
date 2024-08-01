@@ -26,18 +26,14 @@
 #include "common.h"
 #include "stringext.h"
 
-static int url_encode(char *buf, int buflen, char *src, char *prefix);
-static int url_encode_byte(unsigned char in);
+#include "rpg.h"
+
+#define WAKEUP_WORD "!rpg"
 
 /* function declarations */
 static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg);
-static int irc_botcmd_google(irc_t *irc, char *irc_nick, char *arg);
-static int irc_botcmd_wiki(irc_t *irc, char *irc_nick, char *arg);
-static int irc_botcmd_8ball(irc_t *irc, char *irc_nick, char *arg);
-
-static int irc_bot_banter(irc_t *irc, char *irc_nick, char *arg);
 
 struct ircfunc_t {
 	char *command;
@@ -46,12 +42,9 @@ struct ircfunc_t {
 };
 
 static struct ircfunc_t ircfuncs[] = {
-	{"help",   "USAGE: !help <command>",   irc_botcmd_help},
-	{"ping",   "USAGE: !ping",             irc_botcmd_ping},
-	{"smack",  "USAGE: !smack <person>",   irc_botcmd_smack},
-	{"google", "USAGE: !google <search>",  irc_botcmd_google},
-	{"8ball",  "USAGE: !8ball <question>", irc_botcmd_8ball},
-	{"wiki",   "USAGE: !wiki <search>",    irc_botcmd_wiki}
+	{"help",   "USAGE: " WAKEUP_WORD " help <command>",   irc_botcmd_help},
+	{"ping",   "USAGE: " WAKEUP_WORD " ping",             irc_botcmd_ping},
+	{"smack",  "USAGE: " WAKEUP_WORD " smack <person>",   irc_botcmd_smack},
 };
 
 struct strdict_t {
@@ -61,7 +54,6 @@ struct strdict_t {
 
 #define WEBPREFIX_GOOGLE "https://www.google.com/search?q="
 #define WEBPREFIX_GITHUB "https://github.com/search?q="
-
 
 /* irc_connect : connect to an irc server */
 int irc_connect(irc_t *irc, const char* server, const char* port)
@@ -223,6 +215,10 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 				arg++;
 		}
 
+		// Check if the message has the WAKEUP_WORD
+		if (!streq(command, WAKEUP_WORD)) {
+		}
+
 		if (command != NULL) {
 			/* spin through the table of commands */
 			for (i = 0; i < ARRSIZE(ircfuncs); i++) {
@@ -232,40 +228,7 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 			}
 		}
 	} else { /* non command stuff */
-		return irc_bot_banter(irc, irc_nick, msg);
-	}
-
-	return 0;
-}
-
-/* irc_bot_banter : define a static table to wittily respond to quips in chat */
-static int irc_bot_banter(irc_t *irc, char *irc_nick, char *arg)
-{
-	static struct strdict_t dict[] = {
-		{"Hi", "Hello There!"},
-		{"Hello", "You may approach the bench"},
-		{"thank", "No, THANK YOU!"},
-		{"lol", "heh"},
-		{"heh", "lol"},
-		{"rofl", "OMFGWTFLMAO"},
-		{"lmao", "I'll bet you're laughing your ass off."}
-	};
-	int i;
-	char buf[512];
-
-	/* check if the message is in all upper case first */
-	if (strisupper(arg)) {
-		snprintf(buf, sizeof(buf), "%s QUIT SHOUTING!!", irc_nick);
-		irc_msg(irc->s, irc->channel, buf);
-		return 0;
-	}
-
-	/* iterate through the table to see if we have a match */
-	for (i = 0; i < ARRSIZE(dict); i++) {
-		if (re_match(dict[i].key, arg)) {
-			snprintf(buf, sizeof(buf), "%s", dict[i].val);// probably don't need
-			irc_msg(irc->s, irc->channel, buf);
-		}
+		// return irc_bot_banter(irc, irc_nick, msg);
 	}
 
 	return 0;
@@ -309,73 +272,6 @@ static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg)
 	return 0;
 }
 
-/* irc_botcmd_wiki : adds a sloo of wiki functionality */
-static int irc_botcmd_wiki(irc_t *irc, char *irc_nick, char *arg)
-{
-	/*
-	 * Similar to the google command, this command generates a github query to
-	 * search the RetropieWiki.
-	 *
-	 * Github has special search rules, which can be found here:
-	 *     https://help.github.com/en/articles/searching-wikis
-	 * The jist is that we're setting
-	 *     user:retropie
-	 *     repo:retropie-setup
-	 *     in:title
-	 *     in:body
-	 *
-	 * Then plop the query string after it, and encode the URL
-	 * https://github.com/search?q=user%3Aretropie+
-	 *                repo%3ARetroPie-Setup+in%3Atitle+Nintendo+64&type=Wikis
-	 */
-
-	int rc;
-	char mesg[512], tmpbuf[512];
-	memset(mesg, 0, sizeof(mesg));
-	memset(tmpbuf, 0, sizeof(tmpbuf));
-
-	snprintf(tmpbuf, sizeof(mesg),
-			"user:retropie+" "repo:RetroPie-Setup+"
-			"in:title+%s&type=Wikis", arg);
-
-	rc = url_encode(mesg, sizeof(mesg), tmpbuf, WEBPREFIX_GITHUB);
-
-	if (rc < 0) {
-		FIO_PRINTF(FIO_ERR, "Error Converting %s to proper URL", tmpbuf);
-		snprintf(mesg, sizeof(mesg), "Error Converting input to proper URL...");
-	}
-
-	return irc_msg(irc->s, irc->channel, mesg);
-}
-
-/* irc_botcmd_8ball : responds to magic 8 ball requests */
-static int irc_botcmd_8ball(irc_t *irc, char *irc_nick, char *arg)
-{
-	/*
-	 * You'd think there were only 8 answers inside of a magic 8 ball, but it
-	 * turns out there's like, 20! Who knew!
-	 */
-
-	char *table[] = {
-		"It is certain.", "It is decidedly so.", "Without a doubt",
-		"Yes - definitely.", "You may rely on it.", "As I see it, yes.",
-		"Most likely.", "Outlook good.", "Yes.",
-		"Signs point to yes.", "Reply hazy, try again.", "Ask again later",
-		"Better not tell you now", "Cannot predict now",
-		"Concentrate and ask again", "Don't count on it.", "My reply is no.",
-		"My sources say no.", "Outlook not so good.", "Very doubtful."
-	};
-
-	int i;
-
-	i = rand() % ARRSIZE(table);
-
-	if (irc_msg(irc->s, irc->channel, table[i]) < 0)
-		return -1;
-
-	return 0;
-}
-
 /* irc_botcmd_ping : responds to a user with "pong" */
 static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg)
 {
@@ -408,30 +304,6 @@ static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg)
 	return 0;
 }
 
-/* irc_botcmd_google : IRC command for generating Google Links */
-static int irc_botcmd_google(irc_t *irc, char *irc_nick, char *arg)
-{
-	int rc;
-	char mesg[512];
-
-	memset(mesg, 0, sizeof(mesg)); /* clean the buffer */
-
-	if (!arg) {
-		return 0;
-	}
-
-	rc = url_encode(mesg, sizeof(mesg), arg, WEBPREFIX_GOOGLE);
-
-	if (rc < 0) {
-		snprintf(mesg, sizeof(mesg), "Search too long. Google it youself!");
-	}
-
-	if (irc_msg(irc->s, irc->channel, mesg) < 0)
-		return -1;
-
-	return 0;
-}
-
 int irc_log_message(irc_t *irc, const char* nick, const char* message)
 {
 	char timestring[128];
@@ -452,49 +324,49 @@ void irc_close(irc_t *irc)
 	close(irc->s);
 }
 
-/* irc_pong : answers pong requests */
+// irc_pong : answers pong requests
 int irc_pong(int s, const char *data)
 {
 	return sck_sendf(s, "PONG :%s\r\n", data);
 }
 
-/* irc_reg : registers user upon login */
+// irc_reg : registers user upon login
 int irc_reg(int s, const char *nick, const char *username, const char *fullname)
 {
 	return sck_sendf(s, "NICK %s\r\nUSER %s localhost 0 :%s\r\n", nick, username, fullname);
 }
 
-/* irc_join : joins channels */
+// irc_join : joins channels
 int irc_join(int s, const char *data)
 {
 	return sck_sendf(s, "JOIN %s\r\n", data);
 }
 
-/* irc_part : sends the PART command to the server */
+// irc_part : sends the PART command to the server
 int irc_part(int s, const char *data)
 {
 	return sck_sendf(s, "PART %s\r\n", data);
 }
 
-/* irc_nick : changes irc nickname */
+// irc_nick : changes irc nickname
 int irc_nick(int s, const char *data)
 {
 	return sck_sendf(s, "NICK %s\r\n", data);
 }
 
-/* irc_quit : quits irc */
+// irc_quit : quits irc
 int irc_quit(int s, const char *data)
 {
 	return sck_sendf(s, "QUIT :%s\r\n", data);
 }
 
-/* irc_topic : sets/removes the topic of a channel */
+// irc_topic : sets/removes the topic of a channel
 int irc_topic(int s, const char *channel, const char *data)
 {
 	return sck_sendf(s, "TOPIC %s :%s\r\n", channel, data);
 }
 
-/* irc_action : executes an action (.e.g /me is hungry) */
+// irc_action : executes an action (.e.g /me is hungry)
 int irc_action(int s, const char *channel, const char *data)
 {
 	int rc;
@@ -503,7 +375,7 @@ int irc_action(int s, const char *channel, const char *data)
 	return rc;
 }
 
-/* irc_msg : sends a channel message or a query */
+// irc_msg : sends a channel message or a query
 int irc_msg(int s, const char *channel, const char *data)
 {
 	int rc;
@@ -511,57 +383,3 @@ int irc_msg(int s, const char *channel, const char *data)
 	FIO_PRINTF(FIO_LOG, "PRIVMSG %s :%s\r\n", channel, data);
 	return rc;
 }
-
-/* misc */
-
-/* url_encode : encodes a URL query string to a web friendly format */
-static int url_encode(char *buf, int buflen, char *src, char *prefix)
-{
-	int len;
-
-	snprintf(buf, buflen, "%s", prefix); /* plop the query prefix first */
-
-	/* then encode the rest of the URL */
-	for (len = strlen(buf); len < buflen && *src; src++, len = strlen(buf)) {
-		if (url_encode_byte(*src)) { /* encoding */
-			snprintf(buf + len, buflen-len, "%%%02x", *src);
-		} else { /* no encoding */
-			snprintf(buf + len, buflen-len, "%c", *src);
-		}
-	}
-
-	if (*src != '\0') {
-		return -1; /* couldn't encode the url, not enough space */
-	}
-
-	return 0;
-}
-
-/* url_encode_byte : determine if this byte needs to be encoded specially */
-static int url_encode_byte(unsigned char in)
-{
-	int rc;
-
-	rc = 1; /* assume we're going to encode it */
-
-	if (isdigit(in) || isalpha(in)) {
-		rc = 0;
-	}
-
-	/* until we assume we don't want to */
-
-	switch (in) {
-	case '+':
-	case '/':
-	case '&':
-	case '=':
-		rc = 0;
-		break;
-	default:
-		break;
-
-	}
-
-	return rc;
-}
-

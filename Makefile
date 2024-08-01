@@ -2,13 +2,12 @@
 #
 # MOLT Specific (GNU) Makefile
 
-CC = cc
-LINKER = -ldl
-FLAGS = -Wall -g3 -march=native
-TARGET = birc
-SRC = $(wildcard src/*.c)
-OBJ = $(SRC:.c=.o)
-DEP = $(OBJ:.o=.d) # one dependency file for each source
+LINKER=-ldl
+FLAGS=-Wall -g3 -march=native
+TARGET=ircrpg
+SRC=$(wildcard *.c)
+OBJ=$(SRC:.c=.o)
+DEP=$(OBJ:.o=.d) # one dependency file for each source
 
 all: $(TARGET)
 
@@ -16,7 +15,7 @@ all: $(TARGET)
 	@$(CC) $(FLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 %.o: %.c
-	$(CC) -c $(FLAGS) $(PREPROCESSPARMS) -o $@ $<
+	$(CC) -c $(FLAGS) -o $@ $<
 
 -include $(DEP)
 
@@ -30,4 +29,3 @@ clean-obj:
 	
 clean-bin:
 	rm -f $(shell find . -maxdepth 1 -executable -type f)
-

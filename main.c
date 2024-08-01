@@ -1,3 +1,12 @@
+// Brian Chrzanowski
+// 2024-08-01 01:25:36
+//
+// An IRC RPG bot for @badcop_'s IRC system. Please send me a message (somehow) to have this bot
+// in other servers :).
+//
+// TODO
+// 1. New Characters
+
 /*
  * Brian Chrzanowski
  * Wed Feb 20, 2019 03:04
@@ -8,21 +17,11 @@
  * Static C Source Inclusion, for programmable modules
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-
-#include <dlfcn.h>
-#include <sys/types.h>
-#include <dirent.h>
-#include <errno.h>
+#define COMMON_IMPLEMENTATION
+#include "common.h"
 
 #include "irc.h"
 #include "fio.h"
-
-#define MAXMODS 16
-#define DEFAULTMODDIR "./mod"
 
 int run;
 
