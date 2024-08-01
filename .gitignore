@@ -2,3 +2,5 @@
 *.d
 .gdb_history
 ircrpg
+*.txt
+*.db

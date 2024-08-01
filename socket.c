@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <netdb.h>
+#include <errno.h>
 
 int get_socket(const char* host, const char* port)
 {
@@ -40,8 +41,8 @@ int get_socket(const char* host, const char* port)
 		goto error;
 	}
 
-	if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
-		fprintf(stderr, "Couldn't connect.\n");
+	if ((rc = connect(s, res->ai_addr, res->ai_addrlen)) < 0) {
+		fprintf(stderr, "Couldn't connect %d.\n", errno);
 		goto error;
 	}
 

@@ -22,7 +22,6 @@
 
 #include "socket.h"
 #include "irc.h"
-#include "fio.h"
 #include "common.h"
 #include "stringext.h"
 
@@ -52,18 +51,12 @@ struct strdict_t {
 	char *val;
 };
 
-#define WEBPREFIX_GOOGLE "https://www.google.com/search?q="
-#define WEBPREFIX_GITHUB "https://github.com/search?q="
-
 /* irc_connect : connect to an irc server */
 int irc_connect(irc_t *irc, const char* server, const char* port)
 {
 	if ((irc->s = get_socket(server, port)) < 0) {
 		return -1;
 	}
-
-	/* seed the RNG machine */
-	srand(time(NULL));
 
 	return 0;
 }
@@ -92,7 +85,7 @@ int irc_handle_data(irc_t *irc)
 
 	/* wait for and receive data from the server */
 	if ((rc = sck_recv(irc->s, tempbuffer, sizeof(tempbuffer) - 2)) <= 0) {
-		FIO_PRINTF(FIO_ERR, "Got -1 From Socket %s", strerror(errno));
+		ERR("Got -1 From Socket %s", strerror(errno));
 		return -1;
 	}
 
@@ -145,10 +138,12 @@ int irc_parse_action(irc_t *irc)
 
 	} else if (strncmp(irc->servbuf, "NOTICE AUTH :", 13) == 0) {
 		/* we really don't care about NOTICE AUTH junk */
+		ERR("We don't know how to handle NOTICE AUTH...");
 		return 0;
 
 	} else if (strncmp(irc->servbuf, "ERROR :", 7) == 0) {
 		/* log the fact that the server sent us an error and move on */
+		ERR("We don't know how to handle ERROR...");
 		return 0;
 
 	} else {
@@ -313,8 +308,7 @@ int irc_log_message(irc_t *irc, const char* nick, const char* message)
 	strftime(timestring, 127, "%F - %H:%M:%S", localtime(&curtime));
 	timestring[127] = '\0';
 
-	FIO_PRINTF(FIO_LOG, "%s [%s] <%s> %s\n",
-			irc->channel, timestring, nick, message);
+	MSG("%s [%s] <%s> %s\n", irc->channel, timestring, nick, message);
 
 	return 0;
 }
@@ -371,7 +365,7 @@ int irc_action(int s, const char *channel, const char *data)
 {
 	int rc;
 	rc = sck_sendf(s, "PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
-	FIO_PRINTF(FIO_LOG, "PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
+	LOG("PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
 	return rc;
 }
 
@@ -380,6 +374,6 @@ int irc_msg(int s, const char *channel, const char *data)
 {
 	int rc;
 	rc = sck_sendf(s, "PRIVMSG %s :%s\r\n", channel, data);
-	FIO_PRINTF(FIO_LOG, "PRIVMSG %s :%s\r\n", channel, data);
+	LOG("PRIVMSG %s :%s\r\n", channel, data);
 	return rc;
 }

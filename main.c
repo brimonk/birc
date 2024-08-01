@@ -21,7 +21,6 @@
 #include "common.h"
 
 #include "irc.h"
-#include "fio.h"
 
 int run;
 
@@ -32,26 +31,32 @@ void sighandler(int signal)
 
 int main(int argc, char **argv)
 {
-	FILE *fp;
 	irc_t irc;
 
-	fp = fopen("log.txt", "a");
+	srand(time(NULL));
 
-	fio_setfp(fp);
 	run = 1;
 
+#if 0
 	if (irc_connect(&irc, "irc.freenode.org", "6667") < 0) {
 		fprintf(stderr, "Connection failed.\n");
 		goto exit_err;
 	}
+#else
+	// Why doesn't 'localhost' work here?
+	if (irc_connect(&irc, "127.0.0.1", "6667") < 0) {
+		ERR("Connection failed");
+		goto exit_err;
+	}
+#endif
 
-	if (irc_login(&irc, "brimonk_testbot") < 0) {
-		fprintf(stderr, "Couldn't log in.\n");
+	if (irc_login(&irc, "rpgman") < 0) {
+		ERR("Could not log in as 'rpgman'");
 		goto exit_err;
 	}
 
-	if (irc_join_channel(&irc, "#testingbot") < 0) {
-		fprintf(stderr, "Couldn't join channel.\n");
+	if (irc_join_channel(&irc, "#testing") < 0) {
+		ERR("Could not join channel '#testing'");
 		goto exit_err;
 	}
 
@@ -60,13 +65,11 @@ int main(int argc, char **argv)
 	/* print quitting message */
 
 	irc_close(&irc);
-	fio_closefp();
 
 	return 0;
 
 exit_err:
 	irc_close(&irc);
-	fio_closefp();
 	return 1;
 }
 

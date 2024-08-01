@@ -34,6 +34,12 @@ typedef double     f64;
 
 #define streq(a, b) (strcmp((a), (b)) == 0 && strlen((a)) == strlen((b)))
 
+#define MSG(msg, ...) fprintf(stderr, msg "\n", ## __VA_ARGS__)
+#define LOG(msg, ...) fprintf(stderr, "LOG %s:%d " msg "\n", __FILE__, __LINE__, ## __VA_ARGS__)
+#define WRN(msg, ...) fprintf(stderr, "WRN %s:%d " msg "\n", __FILE__, __LINE__, ## __VA_ARGS__)
+#define ERR(msg, ...) fprintf(stderr, "ERR %s:%d " msg "\n", __FILE__, __LINE__, ## __VA_ARGS__)
+#define DBG(msg, ...) fprintf(stderr, "DBG %s:%d " msg "\n", __FILE__, __LINE__, ## __VA_ARGS__)
+
 #ifdef COMMON_IMPLEMENTATION
 #define STB_DS_IMPLEMENTATION // useful for later :)
 
