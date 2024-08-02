@@ -88,13 +88,27 @@ int player_comp(const void *a, const void *b)
 	Player *player_a = (Player *)a;
 	Player *player_b = (Player *)b;
 
-	if (player_a->nickname[0] == 0 && player_b->nickname[0] != 0) {
-		return -1;
-	} else if (player_a->nickname[0] != 0 && player_b->nickname[0] == 0) {
+	if (player_a->nickname[0] == 0 || player_b->nickname[0] == 0)
 		return 1;
-	} else {
-		return strcmp(player_a->nickname, player_b->nickname);
-	}
+	return strcmp(player_a->nickname, player_b->nickname);
+}
+
+int player_search_nickname(const void *a, const void *b)
+{
+	char *nickname = (char *)a;
+	Player *player = (Player *)b;
+
+	if (player->nickname[0] == 0)
+		return -1;
+
+	return strcmp(nickname, player->nickname);
+}
+
+Player *RPG_FindByNickname(char *nickname)
+{
+	void *p = (Player *)bsearch(nickname, g_entries, arrlen(g_entries), sizeof(*g_entries), player_search_nickname);
+	LOG("Finding player '%s' %s %p", nickname, p ? "FOUND" : "NOT FOUND", p);
+	return p;
 }
 
 Player *RPG_AddPlayer(char *nickname)
@@ -109,6 +123,15 @@ Player *RPG_AddPlayer(char *nickname)
 	arrput(g_entries, fe);
 
 	qsort(g_entries, arrlen(g_entries), sizeof(*g_entries), player_comp);
+	void *p = (Player *)&g_entries[arrlen(g_entries)];
 
-	return (Player *)&g_entries[arrlen(g_entries)];
+	LOG("Adding player '%s' at address %p", nickname, p);
+
+	for (size_t i = 0; i < arrlen(g_entries); i++) {
+		if (((Player *)&g_entries[i])->nickname[0] == 0)
+			continue;
+		DBG("%ld - %s", i, ((Player *)&g_entries[i])->nickname);
+	}
+
+	return p;
 }

@@ -185,4 +185,7 @@ typedef struct Player {
 void rpg_init(void);
 void rpg_free(void);
 
+Player *RPG_FindByNickname(char *nickname);
+Player *RPG_AddPlayer(char *nickname);
+
 #endif // RPG_H

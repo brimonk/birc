@@ -104,10 +104,7 @@ int irc_handle_data(irc_t *irc)
 				return 0;
 			}
 
-#if 0
-			FIO_PRINTF(FIO_LOG, "%s", irc->servbuf);
-#endif
-
+			DBG("%s", irc->servbuf);
 			if (irc_parse_action(irc) < 0)
 				return -1;
 
@@ -201,6 +198,12 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 	char *command;
 	char *arg;
 	int i;
+
+	// First, we check if we have a record for this player.
+	Player *player = RPG_FindByNickname(irc_nick);
+	if (player == NULL) {
+		player = RPG_AddPlayer(irc_nick);
+	}
 
 	if (*msg == '!') { /* if we have a thing formatted like a command... */
 		/* get the actual command */

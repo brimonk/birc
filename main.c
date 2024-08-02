@@ -1,5 +1,9 @@
 // Brian Chrzanowski
 // 2024-08-01 01:25:36
+//
+// TODO
+// 1. everyone in the IRC channel gets to play/join
+// 2. allow players to work
 
 #define COMMON_IMPLEMENTATION
 #include "common.h"
