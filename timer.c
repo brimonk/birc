@@ -115,6 +115,16 @@ int timer_fn_enqueue(struct timeval tv, void *(*fn)(void *), void *context)
 	return 0;
 }
 
+// timer_get_time: returns the current time 'sec' and 'msec' in the future
+struct timeval timer_get_time(i32 sec, i32 msec)
+{
+	struct timeval tv = {0};
+	gettimeofday(&tv, NULL);
+	tv.tv_sec += sec;
+	tv.tv_usec += msec * 1000;
+	return tv;
+}
+
 // Subtract values 'y' from 'x', storing the result in 'result'. Return 1 if the diff is negative.
 int timeval_subtract(struct timeval *result, struct timeval *x, struct timeval *y)
 {

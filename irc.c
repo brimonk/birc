@@ -26,12 +26,14 @@
 #include "stringext.h"
 
 #include "rpg.h"
+#include "timer.h"
 
 #define WAKEUP_WORD "!rpg"
 
 /* function declarations */
 static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg);
 
@@ -43,7 +45,8 @@ struct ircfunc_t {
 
 static struct ircfunc_t ircfuncs[] = {
 	{"help",   "USAGE: " WAKEUP_WORD " help <command>",   irc_botcmd_help},
-	{"help",   "USAGE: " WAKEUP_WORD " stats <command>",  irc_botcmd_stats},
+	{"stats",  "USAGE: " WAKEUP_WORD " stats <command>",  irc_botcmd_stats},
+	{"work",   "USAGE: " WAKEUP_WORD " work",             irc_botcmd_work},
 	{"ping",   "USAGE: " WAKEUP_WORD " ping",             irc_botcmd_ping},
 	{"smack",  "USAGE: " WAKEUP_WORD " smack <person>",   irc_botcmd_smack},
 };
@@ -198,10 +201,6 @@ int irc_parse_action(irc_t *irc)
 /* irc_reply_message : checks if someone calls on the bot */
 int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 {
-	char *command;
-	char *arg;
-	int i;
-
 	// First, we check if we have a record for this player.
 	Player *player = RPG_FindByNickname(irc_nick);
 	if (player == NULL) {
@@ -210,21 +209,19 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 
 	if (*msg == '!') { /* if we have a thing formatted like a command... */
 		/* get the actual command */
-		command = strtok(&msg[1], " ");
-		arg = strtok(NULL, "");
 
-		if (arg != NULL) {
-			while (*arg == ' ')
-				arg++;
+		char *words[16];
+		size_t i = 0;
+		for (char *curr = strtok(&msg[0], " "); i < ARRSIZE(words) && curr; curr = strtok(NULL, " ")) {
+			words[i++] = curr;
 		}
 
-		// Check if the message has the WAKEUP_WORD
-		if (!streq(command, WAKEUP_WORD)) {
-		}
+		char *rpg = words[0];
+		char *command = words[1];
+		char *arg = words[2];
 
-		if (command != NULL) {
-			/* spin through the table of commands */
-			for (i = 0; i < ARRSIZE(ircfuncs); i++) {
+		if (streq(rpg, WAKEUP_WORD)) { // !rpg, etc.
+			for (size_t i = 0; i < ARRSIZE(ircfuncs); i++) {
 				if (strcmp(command, ircfuncs[i].command) == 0) {
 					return ircfuncs[i].func(irc, irc_nick, arg);
 				}
@@ -306,6 +303,111 @@ static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg)
 
 	return 0;
 }
+
+typedef struct IRCFutureContext {
+	char nickname[32];
+	irc_t *irc;
+} IRCFutureContext;
+
+static void *irc_botcmd_work_completed(void *ptr)
+{
+	char msg[512] = {0};
+
+	IRCFutureContext *ctx = ptr;
+
+	Player *player = RPG_FindByNickname(ctx->nickname);
+	assert(player != NULL);
+
+	LOG("%s's WORK COMPLETED!", player->nickname);
+
+	char *jobs[] = {
+		"does laundry",
+		"forages for food",
+		"hunts for food",
+		"chops some trees",
+		"creates some charcoal",
+		"buses tables at the inn",
+		"collects taxes",
+		"takes a shift as a guard",
+		"cooks at the inn",
+		"refills tubs at the bath house",
+
+		"tends to the wheat fields",
+		"tends to the barley fields",
+		"tends to the rice fields",
+		"tends to the potato fields",
+		"tends to the spice fields",
+
+		"tends to the apple orchards",
+		"tends to the date orchards",
+		"tends to the pear orchards",
+
+		"tends to flocks of sheep",
+		"tends to flocks of cows",
+		"tends to flocks of pigs",
+		"feeds the chickens",
+		"butchers up some sheep",
+		"butchers up some cows",
+		"butchers up some pigs",
+		"butchers up some pigs making hot dogs in the process",
+		"butchers up some chickens",
+
+		"chases out wild boar",
+		"chases out wild foxes",
+		"chases out wild hyenas",
+
+		"works at the sawmill",
+		"weaves clothing",
+		"carves and puts together furniture",
+
+		"spends time practicing metallurgy",
+		"spends time hammering out nails",
+		"spends time hammering out hinges",
+		"spends time hammering out swords",
+		"spends time hammering out axes",
+		"spends time hammering out knives",
+		"spends time hammering out horseshoes",
+	};
+
+	i32 gp, xp, job;
+
+	// TODO dice functions somewhere else?
+
+	gp = rand() % 20 + 1;
+	xp = rand() % 20 + 1;
+	job = rand() % ARRSIZE(jobs);
+	assert(jobs[job] != NULL);
+
+	snprintf(msg, sizeof msg, "%s %s, and gains %d xp and %d gp!",
+		player->nickname, jobs[job], xp, gp
+	);
+
+	LOG("%s", msg);
+	int rc = irc_action(ctx->irc->s, ctx->irc->channel, msg);
+	LOG("Message send with RC of %d", rc);
+
+	free(ctx);
+
+	return NULL;
+}
+
+IRCFutureContext *GetFutureContext(irc_t *irc, char *nickname)
+{
+	IRCFutureContext *ctx = calloc(1, sizeof(*ctx));
+	strncpy(ctx->nickname, nickname, sizeof ctx->nickname);
+	ctx->irc = irc;
+	return ctx;
+}
+
+// irc_botcmd_work : this particular RPG player wants to do some work
+static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
+{
+	char msg[512];
+	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_work_completed, GetFutureContext(irc, irc_nick));
+	snprintf(msg, sizeof msg, "%s begins to do work for the village...", irc_nick);
+	return irc_action(irc->s, irc->channel, msg);
+}
+
 /* irc_botcmd_smack : smacks someone over TCP/IP */
 static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg)
 {

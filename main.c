@@ -4,6 +4,7 @@
 // TODO
 // 1. everyone in the IRC channel gets to play/join
 // 2. allow players to work
+// 3. use '/names' to fetch all of the channel members and create entries for them
 
 #define COMMON_IMPLEMENTATION
 #include "common.h"
