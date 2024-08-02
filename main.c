@@ -1,21 +1,5 @@
 // Brian Chrzanowski
 // 2024-08-01 01:25:36
-//
-// An IRC RPG bot for @badcop_'s IRC system. Please send me a message (somehow) to have this bot
-// in other servers :).
-//
-// TODO
-// 1. New Characters
-
-/*
- * Brian Chrzanowski
- * Wed Feb 20, 2019 03:04
- *
- * Brian Chrzanowski's IRC Bot
- *
- * TODO (Brian)
- * Static C Source Inclusion, for programmable modules
- */
 
 #define COMMON_IMPLEMENTATION
 #include "common.h"

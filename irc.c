@@ -31,6 +31,7 @@
 
 /* function declarations */
 static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg);
 
@@ -42,6 +43,7 @@ struct ircfunc_t {
 
 static struct ircfunc_t ircfuncs[] = {
 	{"help",   "USAGE: " WAKEUP_WORD " help <command>",   irc_botcmd_help},
+	{"help",   "USAGE: " WAKEUP_WORD " stats <command>",  irc_botcmd_stats},
 	{"ping",   "USAGE: " WAKEUP_WORD " ping",             irc_botcmd_ping},
 	{"smack",  "USAGE: " WAKEUP_WORD " smack <person>",   irc_botcmd_smack},
 };
@@ -276,6 +278,28 @@ static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg)
 	return 0;
 }
 
+// irc_botcmd_stats : handles help command and prints command usage info
+static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg)
+{
+	int damage;
+	char mesg[512];
+
+	damage = rand() % 21 + 1;
+
+	if (!arg) { /* if we have an argument, we'll smack the arg */
+		arg = irc_nick;
+	}
+
+	snprintf(mesg, 511, "smacks %s for %d damage%s.",
+			arg, damage, damage == 20 ? " (SUPER EFFECTIVE)" : "");
+
+	mesg[511] = '\0'; /* ensure we have a NULL terminated string */
+
+	if (irc_action(irc->s, irc->channel, mesg) < 0)
+		return -1;
+
+	return 0;
+}
 /* irc_botcmd_smack : smacks someone over TCP/IP */
 static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg)
 {
