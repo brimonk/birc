@@ -20,11 +20,6 @@ void sighandler(int signal)
 	run = 0;
 }
 
-void *timer_function_test(void *arg)
-{
-	LOG("TIMER FUNCTION TEST WORKED! - %s", (char *)arg);
-}
-
 int main(int argc, char **argv)
 {
 	irc_t irc;
@@ -32,28 +27,6 @@ int main(int argc, char **argv)
 	srand(time(NULL));
 
 	run = 1;
-
-	// TESTING THE TIMER FUNCTIONS
-
-	char *strings[] = {
-		"STRING 9",
-		"STRING 8",
-		"STRING 7",
-		"STRING 6",
-		"STRING 5",
-		"STRING 4",
-		"STRING 3",
-		"STRING 2",
-		"STRING 1",
-	};
-
-
-	struct timeval curr;
-	gettimeofday(&curr, NULL);
-	for (size_t i = 0; i < ARRSIZE(strings); i++) {
-		curr.tv_sec += 1;
-		timer_fn_enqueue(curr, timer_function_test, strings[i]);
-	}
 
 #if 0
 	if (irc_connect(&irc, "irc.freenode.org", "6667") < 0) {
