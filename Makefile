@@ -2,7 +2,7 @@
 #
 # MOLT Specific (GNU) Makefile
 
-LINKER=-ldl -lpthread
+LINKER=-ldl -lpthread -lm
 FLAGS=-Wall -g3 -march=native
 TARGET=ircrpg
 SRC=$(wildcard *.c)

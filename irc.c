@@ -284,24 +284,15 @@ static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg)
 // irc_botcmd_stats : handles help command and prints command usage info
 static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg)
 {
-	int damage;
-	char mesg[512];
+	Player *player = RPG_FindByNickname(irc_nick);
+	assert(player != NULL);
 
-	damage = rand() % 21 + 1;
+	char msg[512] = {0};
 
-	if (!arg) { /* if we have an argument, we'll smack the arg */
-		arg = irc_nick;
-	}
-
-	snprintf(mesg, 511, "smacks %s for %d damage%s.",
-			arg, damage, damage == 20 ? " (SUPER EFFECTIVE)" : "");
-
-	mesg[511] = '\0'; /* ensure we have a NULL terminated string */
-
-	if (irc_action(irc->s, irc->channel, mesg) < 0)
-		return -1;
-
-	return 0;
+	snprintf(msg, sizeof msg, "Stats for '%s': LVL %d (%ldXP), %ld GP",
+		player->nickname, RPG_GetLevel(player), player->xp, player->gp
+	);
+	return irc_msg(irc->s, irc->channel, msg);
 }
 
 typedef struct IRCFutureContext {
@@ -317,6 +308,8 @@ static void *irc_botcmd_work_completed(void *ptr)
 
 	Player *player = RPG_FindByNickname(ctx->nickname);
 	assert(player != NULL);
+
+	i32 starting_level = RPG_GetLevel(player);
 
 	LOG("%s's WORK COMPLETED!", player->nickname);
 
@@ -378,8 +371,14 @@ static void *irc_botcmd_work_completed(void *ptr)
 	job = rand() % ARRSIZE(jobs);
 	assert(jobs[job] != NULL);
 
-	snprintf(msg, sizeof msg, "%s %s, and gains %d xp and %d gp!",
-		player->nickname, jobs[job], xp, gp
+	RPG_AddGP(player, gp);
+	RPG_AddXP(player, xp);
+
+	i32 after_level = RPG_GetLevel(player);
+
+	snprintf(msg, sizeof msg, "%s %s, and gains %dXP and %dGP!%s",
+		player->nickname, jobs[job], xp, gp,
+		starting_level != after_level ? "(LEVEL UP)" : ""
 	);
 
 	LOG("%s", msg);
@@ -405,7 +404,7 @@ static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
 	char msg[512];
 	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_work_completed, GetFutureContext(irc, irc_nick));
 	snprintf(msg, sizeof msg, "%s begins to do work for the village...", irc_nick);
-	return irc_action(irc->s, irc->channel, msg);
+	return irc_msg(irc->s, irc->channel, msg);
 }
 
 /* irc_botcmd_smack : smacks someone over TCP/IP */
@@ -497,7 +496,7 @@ int irc_action(int s, const char *channel, const char *data)
 {
 	int rc;
 	rc = sck_sendf(s, "PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
-	LOG("PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
+	DBG("PRIVMSG %s :\001ACTION %s\001\r\n", channel, data);
 	return rc;
 }
 
@@ -506,6 +505,6 @@ int irc_msg(int s, const char *channel, const char *data)
 {
 	int rc;
 	rc = sck_sendf(s, "PRIVMSG %s :%s\r\n", channel, data);
-	LOG("PRIVMSG %s :%s\r\n", channel, data);
+	DBG("PRIVMSG %s :%s\r\n", channel, data);
 	return rc;
 }

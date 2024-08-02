@@ -177,8 +177,8 @@ typedef struct Item {
 
 typedef struct Player {
 	char nickname[64];
-	i32 level;
-	i32 xp;
+	i64 gp;
+	i64 xp;
 	Item items[3];
 } Player;
 
@@ -187,5 +187,10 @@ void rpg_free(void);
 
 Player *RPG_FindByNickname(char *nickname);
 Player *RPG_AddPlayer(char *nickname);
+
+void RPG_AddGP(Player *player, i64 gp);
+void RPG_AddXP(Player *player, i64 gp);
+
+i32 RPG_GetLevel(Player *player);
 
 #endif // RPG_H
