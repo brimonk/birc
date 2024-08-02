@@ -104,7 +104,10 @@ int irc_handle_data(irc_t *irc)
 				return 0;
 			}
 
+#if 0
 			DBG("%s", irc->servbuf);
+#endif
+
 			if (irc_parse_action(irc) < 0)
 				return -1;
 
