@@ -34,8 +34,8 @@
 static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_quest(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg);
-static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg);
 
 struct ircfunc_t {
 	char *command;
@@ -44,11 +44,11 @@ struct ircfunc_t {
 };
 
 static struct ircfunc_t ircfuncs[] = {
-	{"help",   "USAGE: " WAKEUP_WORD " help <command>",   irc_botcmd_help},
-	{"stats",  "USAGE: " WAKEUP_WORD " stats <command>",  irc_botcmd_stats},
-	{"work",   "USAGE: " WAKEUP_WORD " work",             irc_botcmd_work},
-	{"ping",   "USAGE: " WAKEUP_WORD " ping",             irc_botcmd_ping},
-	{"smack",  "USAGE: " WAKEUP_WORD " smack <person>",   irc_botcmd_smack},
+	{"help",      "USAGE: " WAKEUP_WORD " help <command>",   irc_botcmd_help},
+	{"stats",     "USAGE: " WAKEUP_WORD " stats <command>",  irc_botcmd_stats},
+	{"work",      "USAGE: " WAKEUP_WORD " work",             irc_botcmd_work},
+	{"quest",     "USAGE: " WAKEUP_WORD " quest",            irc_botcmd_quest},
+	{"ping",      "USAGE: " WAKEUP_WORD " ping",             irc_botcmd_ping},
 };
 
 struct strdict_t {
@@ -208,20 +208,16 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 	}
 
 	if (*msg == '!') { /* if we have a thing formatted like a command... */
-		/* get the actual command */
-
-		char *words[16];
-		size_t i = 0;
-		for (char *curr = strtok(&msg[0], " "); i < ARRSIZE(words) && curr; curr = strtok(NULL, " ")) {
-			words[i++] = curr;
-		}
-
-		char *rpg = words[0];
-		char *command = words[1];
-		char *arg = words[2];
+		// then we can parse it out
+		char *rpg = strtok(msg, " ");
+		char *command = strtok(NULL, " ");
+		char *arg = strtok(NULL, "");
+		while (arg && isblank(*arg))
+			arg++;
 
 		if (streq(rpg, WAKEUP_WORD)) { // !rpg, etc.
 			for (size_t i = 0; i < ARRSIZE(ircfuncs); i++) {
+				LOG("%s, %s, %s", rpg, command, arg);
 				if (strcmp(command, ircfuncs[i].command) == 0) {
 					return ircfuncs[i].func(irc, irc_nick, arg);
 				}
@@ -295,10 +291,13 @@ static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg)
 	return irc_msg(irc->s, irc->channel, msg);
 }
 
-typedef struct IRCFutureContext {
-	char nickname[32];
-	irc_t *irc;
-} IRCFutureContext;
+IRCFutureContext *GetFutureContext(irc_t *irc, char *nickname)
+{
+	IRCFutureContext *ctx = calloc(1, sizeof(*ctx));
+	strncpy(ctx->nickname, nickname, sizeof ctx->nickname);
+	ctx->irc = irc;
+	return ctx;
+}
 
 static void *irc_botcmd_work_completed(void *ptr)
 {
@@ -390,14 +389,6 @@ static void *irc_botcmd_work_completed(void *ptr)
 	return NULL;
 }
 
-IRCFutureContext *GetFutureContext(irc_t *irc, char *nickname)
-{
-	IRCFutureContext *ctx = calloc(1, sizeof(*ctx));
-	strncpy(ctx->nickname, nickname, sizeof ctx->nickname);
-	ctx->irc = irc;
-	return ctx;
-}
-
 // irc_botcmd_work : this particular RPG player wants to do some work
 static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
 {
@@ -407,27 +398,15 @@ static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
 	return irc_msg(irc->s, irc->channel, msg);
 }
 
-/* irc_botcmd_smack : smacks someone over TCP/IP */
-static int irc_botcmd_smack(irc_t *irc, char *irc_nick, char *arg)
+// irc_botcmd_quest : this particular RPG player wants to go on a quest
+static int irc_botcmd_quest(irc_t *irc, char *irc_nick, char *arg)
 {
-	int damage;
-	char mesg[512];
-
-	damage = rand() % 21 + 1;
-
-	if (!arg) { /* if we have an argument, we'll smack the arg */
-		arg = irc_nick;
-	}
-
-	snprintf(mesg, 511, "smacks %s for %d damage%s.",
-			arg, damage, damage == 20 ? " (SUPER EFFECTIVE)" : "");
-
-	mesg[511] = '\0'; /* ensure we have a NULL terminated string */
-
-	if (irc_action(irc->s, irc->channel, mesg) < 0)
-		return -1;
-
-	return 0;
+	char msg[512];
+	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_quest_completed, GetFutureContext(irc, irc_nick));
+	snprintf(msg, sizeof msg, "%s goes on a quest%s%s...",
+		irc_nick, arg ? " to " : "", arg ? arg : ""
+	);
+	return irc_msg(irc->s, irc->channel, msg);
 }
 
 int irc_log_message(irc_t *irc, const char* nick, const char* message)
