@@ -37,8 +37,8 @@ void *irc_botcmd_quest_completed(void *ptr)
 
 	if (success) {
 		snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg),
-			" They gain %dXP and %dGP!%s",
-		xp, gp, slevel != elevel ? "(LEVEL UP)" : "");
+			" They gain %dXP and %dGP%s!",
+		xp, gp, slevel != elevel ? " (LEVEL UP)" : "");
 	}
 
 	LOG("%s", msg);
