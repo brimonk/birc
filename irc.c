@@ -26,6 +26,7 @@
 #include "stringext.h"
 
 #include "rpg.h"
+#include "rpg_quest.h"
 #include "timer.h"
 
 #define WAKEUP_WORD "!rpg"
@@ -365,8 +366,8 @@ static void *irc_botcmd_work_completed(void *ptr)
 
 	// TODO dice functions somewhere else?
 
-	gp = rand() % 20 + 1;
-	xp = rand() % 20 + 1;
+	gp = rand() % 10 + 1;
+	xp = rand() % 10 + 1;
 	job = rand() % ARRSIZE(jobs);
 	assert(jobs[job] != NULL);
 
@@ -402,10 +403,11 @@ static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
 static int irc_botcmd_quest(irc_t *irc, char *irc_nick, char *arg)
 {
 	char msg[512];
+
+	rpg_quest_generate(msg, sizeof msg, irc_nick);
+
 	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_quest_completed, GetFutureContext(irc, irc_nick));
-	snprintf(msg, sizeof msg, "%s goes on a quest%s%s...",
-		irc_nick, arg ? " to " : "", arg ? arg : ""
-	);
+
 	return irc_msg(irc->s, irc->channel, msg);
 }
 
