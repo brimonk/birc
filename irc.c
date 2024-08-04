@@ -430,7 +430,7 @@ static int irc_botcmd_quest(irc_t *irc, char *irc_nick, char *arg)
 static int irc_botcmd_fish(irc_t *irc, char *irc_nick, char *arg)
 {
 	char *fmt = "%s goes fishing...";
-	return rpg_possibly_start_action(irc, irc_nick, irc_botcmd_quest_completed, 5, fmt);
+	return rpg_possibly_start_action(irc, irc_nick, irc_botcmd_fish_completed, 5, fmt);
 }
 
 int irc_log_message(irc_t *irc, const char* nick, const char* message)
