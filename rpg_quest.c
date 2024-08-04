@@ -42,7 +42,7 @@ void *irc_botcmd_quest_completed(void *ptr)
 	}
 
 	LOG("%s", msg);
-	int rc = irc_action(ctx->irc->s, ctx->irc->channel, msg);
+	int rc = irc_msg(ctx->irc->s, ctx->irc->channel, msg);
 	LOG("Message send with RC of %d", rc);
 
 	free(ctx);

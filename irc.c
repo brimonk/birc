@@ -27,6 +27,7 @@
 
 #include "rpg.h"
 #include "rpg_quest.h"
+#include "rpg_fish.h"
 #include "timer.h"
 
 #define WAKEUP_WORD "!rpg"
@@ -36,6 +37,7 @@ static int irc_botcmd_help(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_stats(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_quest(irc_t *irc, char *irc_nick, char *arg);
+static int irc_botcmd_fish(irc_t *irc, char *irc_nick, char *arg);
 static int irc_botcmd_ping(irc_t *irc, char *irc_nick, char *arg);
 
 struct ircfunc_t {
@@ -49,6 +51,7 @@ static struct ircfunc_t ircfuncs[] = {
 	{"stats",     "USAGE: " WAKEUP_WORD " stats <command>",  irc_botcmd_stats},
 	{"work",      "USAGE: " WAKEUP_WORD " work",             irc_botcmd_work},
 	{"quest",     "USAGE: " WAKEUP_WORD " quest",            irc_botcmd_quest},
+	{"fish",      "USAGE: " WAKEUP_WORD " fish",             irc_botcmd_fish},
 	{"ping",      "USAGE: " WAKEUP_WORD " ping",             irc_botcmd_ping},
 };
 
@@ -218,7 +221,6 @@ int irc_reply_message(irc_t *irc, char *irc_nick, char *msg)
 
 		if (streq(rpg, WAKEUP_WORD)) { // !rpg, etc.
 			for (size_t i = 0; i < ARRSIZE(ircfuncs); i++) {
-				LOG("%s, %s, %s", rpg, command, arg);
 				if (strcmp(command, ircfuncs[i].command) == 0) {
 					return ircfuncs[i].func(irc, irc_nick, arg);
 				}
@@ -382,7 +384,7 @@ static void *irc_botcmd_work_completed(void *ptr)
 	);
 
 	LOG("%s", msg);
-	int rc = irc_action(ctx->irc->s, ctx->irc->channel, msg);
+	int rc = irc_msg(ctx->irc->s, ctx->irc->channel, msg);
 	LOG("Message send with RC of %d", rc);
 
 	free(ctx);
@@ -396,6 +398,7 @@ static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
 	char msg[512];
 	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_work_completed, GetFutureContext(irc, irc_nick));
 	snprintf(msg, sizeof msg, "%s begins to do work for the village...", irc_nick);
+	LOG("%s", msg);
 	return irc_msg(irc->s, irc->channel, msg);
 }
 
@@ -403,11 +406,19 @@ static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
 static int irc_botcmd_quest(irc_t *irc, char *irc_nick, char *arg)
 {
 	char msg[512];
-
 	rpg_quest_generate(msg, sizeof msg, irc_nick);
-
 	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_quest_completed, GetFutureContext(irc, irc_nick));
+	LOG("%s", msg);
+	return irc_msg(irc->s, irc->channel, msg);
+}
 
+// irc_botcmd_fish : this particular RPG player wants to go on a quest
+static int irc_botcmd_fish(irc_t *irc, char *irc_nick, char *arg)
+{
+	char msg[512];
+	snprintf(msg, sizeof msg, "%s goes fishing...", irc_nick);
+	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_fish_completed, GetFutureContext(irc, irc_nick));
+	LOG("%s", msg);
 	return irc_msg(irc->s, irc->channel, msg);
 }
 

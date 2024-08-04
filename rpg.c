@@ -135,6 +135,20 @@ Player *RPG_AddPlayer(char *nickname)
 	return p;
 }
 
+Player *RPG_LockWithNickname(char *nickname)
+{
+	Player *player = RPG_FindByNickname(nickname);
+	player->lock = true;
+	return player;
+}
+
+Player *RPG_UnlockWithNickname(char *nickname)
+{
+	Player *player = RPG_FindByNickname(nickname);
+	player->lock = false;
+	return player;
+}
+
 void RPG_AddGP(Player *player, i64 gp)
 {
 	player->gp += gp;

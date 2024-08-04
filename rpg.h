@@ -180,6 +180,7 @@ typedef struct Player {
 	i64 gp;
 	i64 xp;
 	Item items[3];
+	i32 lock;
 } Player;
 
 void rpg_init(void);

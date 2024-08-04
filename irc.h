@@ -34,7 +34,7 @@ int irc_action(int s, const char *channel, const char *data);
 int irc_msg(int s, const char *channel, const char *data);
 
 typedef struct IRCFutureContext {
-	char nickname[32];
+	char nickname[64];
 	irc_t *irc;
 } IRCFutureContext;
 
