@@ -135,18 +135,28 @@ Player *RPG_AddPlayer(char *nickname)
 	return p;
 }
 
+// RPG_LockWithNickname: returns a pointer to the player, locking it in the process
 Player *RPG_LockWithNickname(char *nickname)
 {
 	Player *player = RPG_FindByNickname(nickname);
-	player->lock = true;
-	return player;
+	if (player != NULL && player->lock == false) {
+		player->lock = true;
+		return player;
+	} else {
+		return NULL;
+	}
 }
 
+// RPG_UnlockWithNickname: returns a pointer to the player, unlocking it in the process
 Player *RPG_UnlockWithNickname(char *nickname)
 {
 	Player *player = RPG_FindByNickname(nickname);
-	player->lock = false;
-	return player;
+	if (player != NULL && player->lock == true) {
+		player->lock = false;
+		return player;
+	} else {
+		return NULL;
+	}
 }
 
 void RPG_AddGP(Player *player, i64 gp)

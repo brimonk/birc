@@ -308,8 +308,11 @@ static void *irc_botcmd_work_completed(void *ptr)
 
 	IRCFutureContext *ctx = ptr;
 
-	Player *player = RPG_FindByNickname(ctx->nickname);
-	assert(player != NULL);
+	Player *player = RPG_UnlockWithNickname(ctx->nickname);
+	if (player == NULL) {
+		DBG("ctx->nickname [%s] cannot be unlocked!", ctx->nickname);
+		assert(false);
+	}
 
 	i32 starting_level = RPG_GetLevel(player);
 
@@ -392,34 +395,42 @@ static void *irc_botcmd_work_completed(void *ptr)
 	return NULL;
 }
 
+static int rpg_possibly_start_action(irc_t *irc, char *irc_nick, void *(*fn)(void *), int seconds, char *fmt)
+{
+	char msg[512] = {0};
+
+	Player *player = RPG_LockWithNickname(irc_nick);
+	if (player == NULL) {
+		snprintf(msg, sizeof msg, "%s is already doing something!", irc_nick);
+	} else {
+		timer_fn_enqueue(timer_get_time(seconds, 0), fn, GetFutureContext(irc, irc_nick));
+		snprintf(msg, sizeof msg, fmt, irc_nick);
+	}
+
+	LOG("%s", msg);
+	return irc_msg(irc->s, irc->channel, msg);
+}
+
 // irc_botcmd_work : this particular RPG player wants to do some work
 static int irc_botcmd_work(irc_t *irc, char *irc_nick, char *arg)
 {
-	char msg[512];
-	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_work_completed, GetFutureContext(irc, irc_nick));
-	snprintf(msg, sizeof msg, "%s begins to do work for the village...", irc_nick);
-	LOG("%s", msg);
-	return irc_msg(irc->s, irc->channel, msg);
+	char *fmt = "%s begins to do work for the village...";
+	return rpg_possibly_start_action(irc, irc_nick, irc_botcmd_work_completed, 5, fmt);
 }
 
 // irc_botcmd_quest : this particular RPG player wants to go on a quest
 static int irc_botcmd_quest(irc_t *irc, char *irc_nick, char *arg)
 {
 	char msg[512];
-	rpg_quest_generate(msg, sizeof msg, irc_nick);
-	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_quest_completed, GetFutureContext(irc, irc_nick));
-	LOG("%s", msg);
-	return irc_msg(irc->s, irc->channel, msg);
+	rpg_quest_generate(msg, sizeof msg);
+	return rpg_possibly_start_action(irc, irc_nick, irc_botcmd_quest_completed, 5, msg);
 }
 
 // irc_botcmd_fish : this particular RPG player wants to go on a quest
 static int irc_botcmd_fish(irc_t *irc, char *irc_nick, char *arg)
 {
-	char msg[512];
-	snprintf(msg, sizeof msg, "%s goes fishing...", irc_nick);
-	timer_fn_enqueue(timer_get_time(10, 0), irc_botcmd_fish_completed, GetFutureContext(irc, irc_nick));
-	LOG("%s", msg);
-	return irc_msg(irc->s, irc->channel, msg);
+	char *fmt = "%s goes fishing...";
+	return rpg_possibly_start_action(irc, irc_nick, irc_botcmd_quest_completed, 5, fmt);
 }
 
 int irc_log_message(irc_t *irc, const char* nick, const char* message)

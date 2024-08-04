@@ -9,8 +9,11 @@ void *irc_botcmd_quest_completed(void *ptr)
 	char msg[512] = {0};
 	IRCFutureContext *ctx = ptr;
 
-	Player *player = RPG_FindByNickname(ctx->nickname);
-	assert(player != NULL);
+	Player *player = RPG_UnlockWithNickname(ctx->nickname);
+	if (player == NULL) {
+		DBG("ctx->nickname [%s] cannot be unlocked!", ctx->nickname);
+		assert(false);
+	}
 
 	int slevel, elevel;
 
@@ -178,14 +181,14 @@ struct {
 };
 
 // rpg_quest_generate: writes a quest into the buffer 's'
-void rpg_quest_generate(char *s, size_t slen, char *nickname)
+void rpg_quest_generate(char *s, size_t slen)
 {
 	i32 place, goal;
 
 	place = rand() % ARRSIZE(QuestMetadata);
 	goal = rand() % ARRSIZE(QuestMetadata[0].goal);
 
-	snprintf(s, slen, "%s goes on a quest in %s to %s...",
-		nickname, QuestMetadata[place].place, QuestMetadata[place].goal[goal]
+	snprintf(s, slen, "%%s goes on a quest in %s to %s...",
+		QuestMetadata[place].place, QuestMetadata[place].goal[goal]
 	);
 }

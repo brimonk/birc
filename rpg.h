@@ -192,6 +192,12 @@ Player *RPG_AddPlayer(char *nickname);
 void RPG_AddGP(Player *player, i64 gp);
 void RPG_AddXP(Player *player, i64 gp);
 
+// RPG_LockWithNickname: returns a pointer to the player, locking it in the process
+Player *RPG_LockWithNickname(char *nickname);
+
+// RPG_UnlockWithNickname: returns a pointer to the player, unlocking it in the process
+Player *RPG_UnlockWithNickname(char *nickname);
+
 i32 RPG_GetLevel(Player *player);
 
 #endif // RPG_H

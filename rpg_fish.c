@@ -145,8 +145,11 @@ void *irc_botcmd_fish_completed(void *ptr)
 	char msg[512] = {0};
 	IRCFutureContext *ctx = ptr;
 
-	Player *player = RPG_FindByNickname(ctx->nickname);
-	assert(player != NULL);
+	Player *player = RPG_UnlockWithNickname(ctx->nickname);
+	if (player == NULL) {
+		DBG("ctx->nickname [%s] cannot be unlocked!", ctx->nickname);
+		assert(false);
+	}
 
 	int slevel, elevel;
 
