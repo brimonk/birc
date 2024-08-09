@@ -3,6 +3,7 @@
 #include "rpg.h"
 #include "rpg_quest.h"
 #include "monsters.h"
+#include "items.h"
 
 // irc_botcmd_quest_completed: completes the quest for the user
 void *irc_botcmd_quest_completed(void *ptr)
@@ -22,10 +23,14 @@ void *irc_botcmd_quest_completed(void *ptr)
 
 	LOG("%s's QUEST COMPLETED!", player->nickname);
 
-	i32 success = false;
+	i32 rand_value = rand() % 4;
+	i32 success = rand_value >= 2;
+	i32 item_event = (rand_value == 1 || rand_value == 2);
 	i32 gp = 0, xp = 0;
 
-	if ((success = rand() % 2) == 1) {
+	LOG("rand_value %d, success %d, item_event %d", rand_value, success, item_event);
+
+	if (success) {
 		gp = rand() % 100 + 1;
 		xp = rand() % 100 + 1;
 	}
@@ -40,9 +45,26 @@ void *irc_botcmd_quest_completed(void *ptr)
 	);
 
 	if (success) {
+		if (player->item.flags & ITEM_FLAGS_INUSE) {
+			snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg),
+				" Their %s %s is used to great effect!", player->item.adjective, player->item.kind);
+		} else {
+			if (item_event && !(player->item.flags & ITEM_FLAGS_INUSE)) {
+				ITEMS_GenerateItem(player);
+				snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg),
+					" On their quest, they find a %s %s!",
+					player->item.adjective, player->item.kind);
+			}
+		}
+
 		snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg),
-			" They gain %dXP and %dGP%s!",
-		xp, gp, slevel != elevel ? " (LEVEL UP)" : "");
+			" They gain %dXP and %dGP%s!", xp, gp, slevel != elevel ? " (LEVEL UP)" : "");
+	} else {
+		if (item_event && (player->item.flags & ITEM_FLAGS_INUSE)) {
+			snprintf(msg + strlen(msg), sizeof(msg) - strlen(msg),
+				" In the process, they lose their %s!", player->item.kind);
+			ITEMS_ClearItem(player);
+		}
 	}
 
 	LOG("%s", msg);
