@@ -21,33 +21,38 @@ void sighandler(int signal)
 	run = 0;
 }
 
+i32 main_connect(irc_t *irc, char *address, char *port, i32 use_tls)
+{
+	// TODO handle use_tls at some point
+	memset(irc, 0, sizeof(*irc));
+	i32 rc = irc_connect(irc, address, port);
+	if (rc < 0) {
+		ERR("Connection to '%s:%s' failed! ERR %d", address, port, rc);
+	}
+	return rc;
+}
+
 int main(int argc, char **argv)
 {
+	i32 rc;
 	irc_t irc;
 
 	srand(time(NULL));
 
 	run = 1;
 
-#if 0
-	if (irc_connect(&irc, "irc.freenode.org", "6667") < 0) {
-		fprintf(stderr, "Connection failed.\n");
-		goto exit_err;
-	}
-#else
-	// Why doesn't 'localhost' work here?
-	if (irc_connect(&irc, "127.0.0.1", "6667") < 0) {
-		ERR("Connection failed");
-		goto exit_err;
-	}
-#endif
+	// rc = main_connect(&irc, "irc.freenode.org", "6667", false);
+	// rc = main_connect(&irc, "127.0.0.1", "6667", false);
+	rc = main_connect(&irc, "irc.badcop.live", "6667", false);
+	if (rc < 0) exit(1);
 
 	if (irc_login(&irc, "rpgman") < 0) {
 		ERR("Could not log in as 'rpgman'");
 		goto exit_err;
 	}
 
-	if (irc_join_channel(&irc, "#testing") < 0) {
+	// if (irc_join_channel(&irc, "#testing") < 0) {
+	if (irc_join_channel(&irc, "#test") < 0) {
 		ERR("Could not join channel '#testing'");
 		goto exit_err;
 	}

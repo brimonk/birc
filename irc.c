@@ -72,7 +72,7 @@ int irc_connect(irc_t *irc, const char* server, const char* port)
 
 int irc_login(irc_t *irc, const char* nick)
 {
-	return irc_reg(irc->s, nick, "brimonk", "brimonk test bot");
+	return irc_reg(irc->s, nick, nick, "an idle RPG sim");
 }
 
 int irc_join_channel(irc_t *irc, const char* channel)
@@ -89,7 +89,7 @@ int irc_leave_channel(irc_t *irc)
 
 int irc_handle_data(irc_t *irc)
 {
-	char tempbuffer[512];
+	char tempbuffer[512] = { 0 };
 	int rc, i, bufidx;
 
 	/* wait for and receive data from the server */
@@ -97,6 +97,8 @@ int irc_handle_data(irc_t *irc)
 		ERR("Got -1 From Socket %s", strerror(errno));
 		return -1;
 	}
+
+	printf("RAW: %s", tempbuffer);
 
 	tempbuffer[rc] = '\0';
 	bufidx = 0;
@@ -111,7 +113,7 @@ int irc_handle_data(irc_t *irc)
 				return 0;
 			}
 
-#if 0
+#if 1
 			DBG("%s", irc->servbuf);
 #endif
 

@@ -50,6 +50,14 @@ void rpg_init(void)
 
 		fclose(fp);
 	}
+
+	// After loading, we need to iterate through the list to DISABLE all of the locks that may or
+	// may not be set.
+
+	for (size_t i = 0; i < arrlen(g_entries); i++) {
+		Player *player = (Player *)&g_entries[i];
+		player->lock = false;
+	}
 }
 
 __attribute__((destructor))
