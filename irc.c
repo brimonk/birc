@@ -47,12 +47,13 @@ struct ircfunc_t {
 };
 
 static struct ircfunc_t ircfuncs[] = {
-	{"help",      "USAGE: " WAKEUP_WORD " help <command>",   irc_botcmd_help},
-	{"stats",     "USAGE: " WAKEUP_WORD " stats <command>",  irc_botcmd_stats},
-	{"work",      "USAGE: " WAKEUP_WORD " work",             irc_botcmd_work},
-	{"quest",     "USAGE: " WAKEUP_WORD " quest",            irc_botcmd_quest},
-	{"fish",      "USAGE: " WAKEUP_WORD " fish",             irc_botcmd_fish},
-	{"ping",      "USAGE: " WAKEUP_WORD " ping",             irc_botcmd_ping},
+	{"help",      "USAGE: " WAKEUP_WORD " help <command>", irc_botcmd_help},
+	{"stats",     "USAGE: " WAKEUP_WORD " stats",          irc_botcmd_stats},
+	{"stat",      "USAGE: " WAKEUP_WORD " stat",           irc_botcmd_stats}, // alias for "stats"
+	{"work",      "USAGE: " WAKEUP_WORD " work",           irc_botcmd_work},
+	{"quest",     "USAGE: " WAKEUP_WORD " quest",          irc_botcmd_quest},
+	{"fish",      "USAGE: " WAKEUP_WORD " fish",           irc_botcmd_fish},
+	{"ping",      "USAGE: " WAKEUP_WORD " ping",           irc_botcmd_ping},
 };
 
 struct strdict_t {
@@ -90,7 +91,7 @@ int irc_leave_channel(irc_t *irc)
 int irc_handle_data(irc_t *irc)
 {
 	char tempbuffer[512] = { 0 };
-	int rc, i, bufidx;
+	int rc;
 
 	/* wait for and receive data from the server */
 	if ((rc = sck_recv(irc->s, tempbuffer, sizeof(tempbuffer) - 2)) <= 0) {
@@ -98,107 +99,84 @@ int irc_handle_data(irc_t *irc)
 		return -1;
 	}
 
-	printf("RAW: %s", tempbuffer);
+	char *s = strpbrk(tempbuffer, "\r\n");
+	*s = 0;
 
-	tempbuffer[rc] = '\0';
-	bufidx = 0;
+	if (strlen(tempbuffer) == 0)
+		return 0;
 
-	for (i = 0; i < rc; i++) {
-		switch (tempbuffer[i]) {
-		case '\r':
-		case '\n':
-			irc->servbuf[bufidx] = '\0';
-
-			if (strlen(irc->servbuf) == 0) {
-				return 0;
-			}
+	strncpy(irc->servbuf, tempbuffer, MIN(rc, sizeof(irc->servbuf)));
 
 #if 1
-			DBG("%s", irc->servbuf);
+	printf("RAW: %s", tempbuffer);
+	DBG("%s", irc->servbuf);
 #endif
 
-			if (irc_parse_action(irc) < 0)
-				return -1;
-
-			break;
-
-		default:
-			irc->servbuf[bufidx] = tempbuffer[i];
-			if (bufidx >= (sizeof(irc->servbuf) -1))
-				; // Overflow!
-			else
-				bufidx++;
-		}
-	}
-
-	return 0;
+	return irc_parse_action(irc);
 }
 
 /* irc_parse_action : parses the incoming action the server's sending us */
 int irc_parse_action(irc_t *irc)
 {
-	char *ptr;
-	int privmsg;
-	char irc_nick[128];
-	char irc_msg[512];
+	char *p1, *p2;
+	int prefix = false;
+	char irc_nick[256] = {0};
+	char cmd[256] = {0};
+	char irc_msg[512] = {0};
 
-	privmsg = 0;
+	if (irc->servbuf[0] == ':') { // prefix is optional, and indicated by a ':'
+		p1 = &irc->servbuf[1];
+		p2 = strpbrk(p1, " !%"); // find the first end of the nickname part of the prefix
 
-	if (strncmp(irc->servbuf, "PING :", 6) == 0) { /* see if it's a ping */
+		strncpy(irc_nick, p1, MIN(p2 - p1, sizeof(irc_nick)));
+		prefix = true;
+
+		if (*p2 != ' ') {
+			p2 = strchr(p2, ' ');
+		}
+	}
+
+	// parse out the command
+	if (prefix) {
+		p1 = p2 + 1;
+		p2 = strchr(p1, ' ');
+	} else {
+		p1 = &irc->servbuf[0];
+		p2 = strchr(p1, ' ');
+	}
+
+	strncpy(cmd, p1, MIN(p2 - p1, sizeof(cmd)));
+
+	// TODO test this
+
+	if (streq(cmd, "PING")) {
 		return irc_pong(irc->s, &irc->servbuf[6]);
-
-	} else if (strncmp(irc->servbuf, "NOTICE AUTH :", 13) == 0) {
+	} else if (streq(cmd, "NOTICE AUTH")) {
 		/* we really don't care about NOTICE AUTH junk */
 		ERR("We don't know how to handle NOTICE AUTH...");
 		return 0;
-
-	} else if (strncmp(irc->servbuf, "ERROR :", 7) == 0) {
+	} else if (streq(cmd, "ERROR")) {
 		/* log the fact that the server sent us an error and move on */
 		ERR("We don't know how to handle ERROR...");
 		return 0;
+	} else if (streq(cmd, "PRIVMSG")) {
+		// parse out the message that we need to reply to
+		// at this point, we can use p2 to get out the message
+		p1 = strchr(p2, ':');
 
-	} else {
-		/* parse the message to get nick, channel, message */
-
-		*irc_nick = '\0';
-		*irc_msg = '\0';
-
-		/* see if we have a non-message string */
-		if (strchr(irc->servbuf, 1) != NULL)
-			return 0;
-
-		if (irc->servbuf[0] == ':') {
-			ptr = strtok(irc->servbuf, "!");
-
-			if (ptr == NULL) {
-				printf("ptr == NULL\n");
-				return 0;
-			} else {
-				strncpy(irc_nick, &ptr[1], 127);
-				irc_nick[127] = '\0';
-			}
-
-			while ((ptr = strtok(NULL, " ")) != NULL) {
-				if (strcmp(ptr, "PRIVMSG") == 0) {
-					privmsg = 1;
-					break;
-				}
-			}
-
-			if (privmsg) {
-				if ((ptr = strtok(NULL, ":")) != NULL &&
-						(ptr = strtok(NULL, "")) != NULL) {
-					strncpy(irc_msg, ptr, 511);
-					irc_msg[511] = '\0';
-				}
-			}
-
-			if (privmsg && strlen(irc_nick) > 0 && strlen(irc_msg) > 0) {
-				irc_log_message(irc, irc_nick, irc_msg);
-				if (irc_reply_message(irc, irc_nick, irc_msg) < 0)
-					return -1;
-			}
+		if (p1 == NULL) {
+			ERR("INVALID PRIVMSG FORMAT");
+			return -1;
 		}
+
+		p1++;
+		strncpy(irc_msg, p1, strlen(p1));
+
+		DBG("USER: %s, IRC COMMAND: %s, MSG: %s", irc_nick, cmd, irc_msg);
+
+		irc_log_message(irc, irc_nick, irc_msg);
+		if (irc_reply_message(irc, irc_nick, irc_msg) < 0)
+			return -1;
 	}
 
 	return 0;
